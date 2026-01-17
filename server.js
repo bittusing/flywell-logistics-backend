@@ -30,7 +30,7 @@ connectDB();
 app.use(cors({
 //   origin: process.env.FRONTEND_URL || 'http://localhost:3000' || 'https://flywell-logistics.vercel.app',
   origin: 'https://flywell-logistics.vercel.app/',
-  credentials: true
+//   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
