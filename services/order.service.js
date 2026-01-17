@@ -299,6 +299,72 @@ class OrderService {
       };
     }
   }
+
+  /**
+   * Update order status (called by webhooks or manual update)
+   * @param {String} orderId - Order ID (optional)
+   * @param {String} awb - AWB number (optional)
+   * @param {String} status - New status
+   * @param {Object} trackingData - Additional tracking data
+   * @param {String} partner - Delivery partner
+   * @returns {Object} Updated order
+   */
+  async updateOrderStatus(orderId, awb, status, trackingData = {}, partner = null) {
+    let order;
+
+    // Find order by orderId or awb
+    if (orderId) {
+      order = await Order.findById(orderId);
+    } else if (awb) {
+      order = await Order.findOne({ awb });
+    } else {
+      throw new AppError('Order ID or AWB is required', 400);
+    }
+
+    if (!order) {
+      throw new AppError('Order not found', 404);
+    }
+
+    // Validate status
+    if (!Object.values(ORDER_STATUS).includes(status)) {
+      throw new AppError('Invalid order status', 400);
+    }
+
+    // Update order status
+    const previousStatus = order.status;
+    order.status = status;
+
+    // Update AWB if provided
+    if (awb && !order.awb) {
+      order.awb = awb;
+    }
+
+    // Update tracking URL if provided
+    if (trackingData.trackingUrl) {
+      order.trackingUrl = trackingData.trackingUrl;
+    }
+
+    // Store tracking data in metadata
+    order.metadata = {
+      ...order.metadata,
+      statusHistory: [
+        ...(order.metadata?.statusHistory || []),
+        {
+          status,
+          previousStatus,
+          updatedAt: new Date(),
+          source: partner || 'system',
+          trackingData
+        }
+      ],
+      lastTrackingUpdate: new Date(),
+      ...trackingData
+    };
+
+    await order.save();
+
+    return order;
+  }
 }
 
 module.exports = new OrderService();

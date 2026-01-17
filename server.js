@@ -12,6 +12,7 @@ const connectDB = require('./config/database');
 const authRoutes = require('./routes/auth.routes');
 const walletRoutes = require('./routes/wallet.routes');
 const orderRoutes = require('./routes/order.routes');
+const webhookRoutes = require('./routes/webhook.routes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler.middleware');
@@ -44,6 +45,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // 404 handler - must be after all routes
 app.use((req, res) => {
