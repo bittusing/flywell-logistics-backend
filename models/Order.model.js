@@ -92,11 +92,14 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Generate order number before saving
+// Generate order number before saving (fallback if not provided)
 orderSchema.pre('save', async function(next) {
   if (!this.orderNumber) {
+    const timestamp = Date.now();
+    const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     const count = await mongoose.model('Order').countDocuments();
-    this.orderNumber = `ORD${Date.now()}${String(count + 1).padStart(6, '0')}`;
+    const sequential = String(count + 1).padStart(4, '0');
+    this.orderNumber = `ORD${timestamp}${randomSuffix}${sequential}`;
   }
   next();
 });

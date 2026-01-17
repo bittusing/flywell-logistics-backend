@@ -108,9 +108,18 @@ class OrderService {
       );
     }
 
+    // Generate unique order number
+    // Format: ORD + timestamp + random 4 digits + sequential number
+    const timestamp = Date.now();
+    const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const orderCount = await Order.countDocuments();
+    const sequential = String(orderCount + 1).padStart(4, '0');
+    const orderNumber = `ORD${timestamp}${randomSuffix}${sequential}`;
+
     // Create order
     const order = await Order.create({
       user: userId,
+      orderNumber: orderNumber,
       pickupDetails,
       deliveryDetails,
       packageDetails,
