@@ -13,6 +13,9 @@ const authRoutes = require('./routes/auth.routes');
 const walletRoutes = require('./routes/wallet.routes');
 const orderRoutes = require('./routes/order.routes');
 const webhookRoutes = require('./routes/webhook.routes');
+const dashboardRoutes = require('./routes/dashboard.routes');
+const pickupRequestRoutes = require('./routes/pickupRequest.routes');
+const invoiceRoutes = require('./routes/invoice.routes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler.middleware');
@@ -46,6 +49,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/pickup-requests', pickupRequestRoutes);
+app.use('/api/invoices', invoiceRoutes);
 
 // 404 handler - must be after all routes
 app.use((req, res) => {

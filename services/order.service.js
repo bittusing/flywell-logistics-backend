@@ -41,19 +41,24 @@ class OrderService {
       // Get rate from third-party API
       const rateResponse = await thirdPartyAPIService.calculateRate(deliveryPartner, rateData);
 
-      // Calculate total amount
-      const baseRate = rateResponse.rate || rateResponse.amount || 0;
+      // Map response to our format
+      const baseRate = rateResponse.baseRate || rateResponse.rate || rateResponse.amount || 0;
       const additionalCharges = rateResponse.additionalCharges || 0;
-      const totalAmount = baseRate + additionalCharges;
+      const gst = rateResponse.gst || 0;
+      const dph = rateResponse.dph || 0;
+      const totalAmount = rateResponse.totalAmount || (baseRate + additionalCharges + gst + dph);
 
       return {
         baseRate,
         additionalCharges,
+        gst,
+        dph,
         totalAmount,
-        currency: 'INR',
+        currency: rateResponse.currency || 'INR',
         partner: deliveryPartner,
         estimatedDelivery: rateResponse.estimatedDelivery || null,
-        serviceType: rateResponse.serviceType || 'standard'
+        serviceType: rateResponse.serviceType || 'standard',
+        metadata: rateResponse.metadata || {}
       };
     } catch (error) {
       // If third-party API fails, use fallback calculation
@@ -215,13 +220,23 @@ class OrderService {
   }
 
   /**
-   * Get order by ID
-   * @param {String} orderId - Order ID
+   * Get order by ID or order number
+   * @param {String} orderId - Order ID or order number
    * @param {String} userId - User ID (for authorization)
    * @returns {Object} Order details
    */
   async getOrderById(orderId, userId) {
-    const order = await Order.findById(orderId).populate('user', 'name email phone');
+    let order;
+    
+    // Check if orderId is a valid MongoDB ObjectId (24 hex characters)
+    if (orderId.match(/^[0-9a-fA-F]{24}$/)) {
+      // It's an ObjectId, use findById
+      order = await Order.findById(orderId).populate('user', 'name email phone');
+    } else {
+      // It's likely an order number, search by orderNumber
+      order = await Order.findOne({ orderNumber: orderId, user: userId })
+        .populate('user', 'name email phone');
+    }
 
     if (!order) {
       throw new AppError('Order not found', 404);

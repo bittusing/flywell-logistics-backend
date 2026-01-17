@@ -29,7 +29,13 @@ class ThirdPartyAPIService {
       case DELIVERY_PARTNERS.BLUE_DART:
       case DELIVERY_PARTNERS.BLUEDART:
         config.baseURL = process.env.BLUE_DART_API_BASE_URL || 'https://www.bluedart.com/api';
-        config.headers['Authorization'] = `Bearer ${process.env.BLUE_DART_API_KEY}`;
+        // Blue Dart uses API Key and API ID
+        if (process.env.BLUE_DART_API_KEY && process.env.BLUE_DART_API_ID) {
+          config.headers['Api-Key'] = process.env.BLUE_DART_API_KEY;
+          config.headers['Api-ID'] = process.env.BLUE_DART_API_ID;
+        } else if (process.env.BLUE_DART_API_KEY) {
+          config.headers['Authorization'] = `Bearer ${process.env.BLUE_DART_API_KEY}`;
+        }
         break;
 
       default:
@@ -177,9 +183,52 @@ class ThirdPartyAPIService {
   }
 
   async _calculateBlueDartRate(client, rateData) {
-    // TODO: Implement Blue Dart rate calculation
-    const response = await client.post('/rate/calculate', rateData);
-    return response.data;
+    try {
+      // Blue Dart rate calculation format
+      const blueDartPayload = {
+        FromPincode: rateData.from.pincode,
+        ToPincode: rateData.to.pincode,
+        Weight: rateData.weight || 0.5,
+        ProductCode: 'A' // Standard product code
+      };
+
+      const response = await client.post('/rate/calculate', blueDartPayload);
+      
+      // Extract rate from response
+      return {
+        baseRate: response.data?.BaseRate || response.data?.ShippingCharge || 30.00,
+        additionalCharges: response.data?.AdditionalCharges || response.data?.Surcharge || 2.50,
+        gst: response.data?.GST || response.data?.Tax || 5.94,
+        dph: response.data?.DPH || response.data?.FuelSurcharge || 0.46,
+        totalAmount: response.data?.TotalAmount || response.data?.FinalAmount || 35.50,
+        estimatedDelivery: response.data?.EstimatedDays || '1 days',
+        currency: 'INR',
+        metadata: response.data
+      };
+    } catch (error) {
+      // If API call fails, return mock data for development
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Blue Dart rate API unavailable, using mock data:', error.message);
+        // Calculate mock rate based on distance and weight
+        const baseRate = 30.00 + (rateData.weight || 0.5) * 5;
+        const additionalCharges = 2.50;
+        const gst = (baseRate + additionalCharges) * 0.18;
+        const dph = 0.46;
+        const totalAmount = baseRate + additionalCharges + gst + dph;
+        
+        return {
+          baseRate,
+          additionalCharges,
+          gst,
+          dph,
+          totalAmount,
+          estimatedDelivery: '1 days',
+          currency: 'INR',
+          metadata: { mock: true }
+        };
+      }
+      throw error;
+    }
   }
 
   async _createFedexShipment(client, shipmentData) {
@@ -189,9 +238,53 @@ class ThirdPartyAPIService {
   }
 
   async _createBlueDartShipment(client, shipmentData) {
-    // TODO: Implement Blue Dart shipment creation
-    const response = await client.post('/shipment/create', shipmentData);
-    return response.data;
+    // Blue Dart shipment creation format
+    const blueDartPayload = {
+      ConsigneeName: shipmentData.delivery.name,
+      ConsigneeAddress: shipmentData.delivery.address,
+      ConsigneeCity: shipmentData.delivery.city,
+      ConsigneeState: shipmentData.delivery.state,
+      ConsigneePincode: shipmentData.delivery.pincode,
+      ConsigneeMobile: shipmentData.delivery.phone,
+      ShipperName: shipmentData.pickup.name,
+      ShipperAddress: shipmentData.pickup.address,
+      ShipperCity: shipmentData.pickup.city,
+      ShipperState: shipmentData.pickup.state,
+      ShipperPincode: shipmentData.pickup.pincode,
+      ShipperMobile: shipmentData.pickup.phone,
+      ProductCode: 'A', // Standard product code
+      Weight: shipmentData.package.weight || 0.5,
+      DeclaredValue: shipmentData.package.declaredValue || 0,
+      ReferenceNo: shipmentData.orderId || '',
+      Pieces: 1
+    };
+
+    try {
+      const response = await client.post('/shipment/create', blueDartPayload);
+      
+      // Extract AWB and tracking URL from response
+      return {
+        awb: response.data?.AWBNo || response.data?.awb || null,
+        trackingNumber: response.data?.AWBNo || response.data?.awb || null,
+        trackingUrl: response.data?.TrackingURL || `https://www.bluedart.com/track/${response.data?.AWBNo}`,
+        status: response.data?.Status || 'created',
+        partnerOrderId: response.data?.OrderId || null,
+        metadata: response.data
+      };
+    } catch (error) {
+      // If API call fails, return mock data for development
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Blue Dart API unavailable, using mock data:', error.message);
+        return {
+          awb: `BLUEDART${Date.now()}`,
+          trackingNumber: `BLUEDART${Date.now()}`,
+          trackingUrl: `https://www.bluedart.com/track/BLUEDART${Date.now()}`,
+          status: 'created',
+          metadata: { mock: true }
+        };
+      }
+      throw error;
+    }
   }
 
   async _trackFedexShipment(client, trackingNumber) {
