@@ -1,315 +1,263 @@
-const axios = require('axios');
 const AppError = require('../utils/AppError');
 const { DELIVERY_PARTNERS } = require('../config/constants');
+const { getProvider, hasProvider } = require('../providers');
 
 /**
  * Third Party API Service
- * Handles integration with delivery partner APIs (FedEx, Blue Dart, etc.)
+ * 
+ * This service acts as a facade/orchestrator for all delivery partner providers.
+ * It uses the Provider Pattern for scalability and maintainability.
+ * 
+ * Architecture:
+ * - Each delivery partner has its own Provider class (extends BaseProvider)
+ * - Providers are registered in providers/index.js
+ * - This service delegates calls to appropriate provider
+ * 
+ * Benefits:
+ * 1. Easy to add new providers - just create provider class and register
+ * 2. Each provider handles its own API format, auth, endpoints
+ * 3. Consistent interface across all providers
+ * 4. Better error handling and logging per provider
+ * 5. Easy to test and mock individual providers
+ * 
+ * Usage:
+ * const thirdPartyAPI = require('./services/thirdPartyAPI.service');
+ * const rate = await thirdPartyAPI.calculateRate('delhivery', rateData);
  */
 class ThirdPartyAPIService {
   /**
-   * Initialize third-party API client
-   * @param {String} partner - Delivery partner name
-   * @returns {Object} Configured axios instance
-   */
-  _getClient(partner) {
-    const config = {
-      timeout: 30000, // 30 seconds timeout
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    };
-
-    switch (partner) {
-      case DELIVERY_PARTNERS.FEDEX:
-        config.baseURL = process.env.FEDEX_API_BASE_URL || 'https://apis.fedex.com';
-        config.headers['Authorization'] = `Bearer ${process.env.FEDEX_API_KEY}`;
-        break;
-
-      case DELIVERY_PARTNERS.BLUE_DART:
-      case DELIVERY_PARTNERS.BLUEDART:
-        config.baseURL = process.env.BLUE_DART_API_BASE_URL || 'https://www.bluedart.com/api';
-        // Blue Dart uses API Key and API ID
-        if (process.env.BLUE_DART_API_KEY && process.env.BLUE_DART_API_ID) {
-          config.headers['Api-Key'] = process.env.BLUE_DART_API_KEY;
-          config.headers['Api-ID'] = process.env.BLUE_DART_API_ID;
-        } else if (process.env.BLUE_DART_API_KEY) {
-          config.headers['Authorization'] = `Bearer ${process.env.BLUE_DART_API_KEY}`;
-        }
-        break;
-
-      default:
-        throw new AppError(`Unsupported delivery partner: ${partner}`, 400);
-    }
-
-    return axios.create(config);
-  }
-
-  /**
    * Calculate shipping rate
-   * @param {String} partner - Delivery partner
+   * 
+   * Delegates to the appropriate provider based on partner name.
+   * 
+   * @param {String} partner - Delivery partner name (e.g., 'delhivery', 'blue_dart')
    * @param {Object} rateData - Rate calculation data
-   * @returns {Object} Rate information
+   * @param {String} rateData.from.pincode - Origin pincode
+   * @param {String} rateData.to.pincode - Destination pincode
+   * @param {Number} rateData.weight - Weight in kg
+   * @param {Object} rateData.dimensions - Optional dimensions
+   * @param {Number} rateData.declaredValue - Optional declared value
+   * @returns {Promise<Object>} Rate information
+   * @throws {AppError} If partner not supported or calculation fails
+   * 
+   * @example
+   * const rate = await thirdPartyAPI.calculateRate('delhivery', {
+   *   from: { pincode: '110001' },
+   *   to: { pincode: '400001' },
+   *   weight: 1.5
+   * });
    */
   async calculateRate(partner, rateData) {
     try {
-      const client = this._getClient(partner);
-      
-      // Partner-specific rate calculation logic
-      switch (partner) {
-        case DELIVERY_PARTNERS.FEDEX:
-          return await this._calculateFedexRate(client, rateData);
-        
-        case DELIVERY_PARTNERS.BLUE_DART:
-        case DELIVERY_PARTNERS.BLUEDART:
-          return await this._calculateBlueDartRate(client, rateData);
-        
-        default:
-          throw new AppError(`Rate calculation not implemented for ${partner}`, 501);
+      // Validate partner
+      if (!Object.values(DELIVERY_PARTNERS).includes(partner)) {
+        throw new AppError(`Invalid delivery partner: ${partner}`, 400);
       }
-    } catch (error) {
-      if (error.response) {
+
+      // Get provider for this partner
+      if (!hasProvider(partner)) {
         throw new AppError(
-          `Third-party API error: ${error.response.data?.message || error.message}`,
-          error.response.status || 500
+          `Provider for '${partner}' not implemented. Available: ${Object.keys(require('../providers').PROVIDERS).join(', ')}`,
+          501
         );
       }
-      throw error;
+
+      const provider = getProvider(partner);
+      
+      // Delegate to provider
+      console.log(`[ThirdPartyAPI] Calculating rate with ${partner} provider`);
+      const result = await provider.calculateRate(rateData);
+      
+      return result;
+    } catch (error) {
+      // If it's already an AppError, re-throw it
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      // Otherwise, wrap in AppError
+      console.error(`[ThirdPartyAPI] Error calculating rate for ${partner}:`, error.message);
+      throw new AppError(
+        `Rate calculation failed for ${partner}: ${error.message}`,
+        500
+      );
     }
   }
 
   /**
-   * Create shipment/order with third-party
-   * @param {String} partner - Delivery partner
+   * Create shipment/order with delivery partner
+   * 
+   * Delegates to the appropriate provider to create shipment and get AWB.
+   * 
+   * @param {String} partner - Delivery partner name
    * @param {Object} shipmentData - Shipment data
-   * @returns {Object} Shipment information
+   * @param {Object} shipmentData.pickup - Pickup address
+   * @param {Object} shipmentData.delivery - Delivery address
+   * @param {Object} shipmentData.package - Package details
+   * @param {String} shipmentData.orderId - Order ID
+   * @returns {Promise<Object>} Shipment information with AWB
+   * @throws {AppError} If partner not supported or creation fails
+   * 
+   * @example
+   * const shipment = await thirdPartyAPI.createShipment('delhivery', {
+   *   pickup: { name: '...', address: '...', pincode: '...' },
+   *   delivery: { name: '...', address: '...', pincode: '...' },
+   *   package: { weight: 1.5 },
+   *   orderId: 'ORD123'
+   * });
    */
   async createShipment(partner, shipmentData) {
     try {
-      const client = this._getClient(partner);
-      
-      switch (partner) {
-        case DELIVERY_PARTNERS.FEDEX:
-          return await this._createFedexShipment(client, shipmentData);
-        
-        case DELIVERY_PARTNERS.BLUE_DART:
-        case DELIVERY_PARTNERS.BLUEDART:
-          return await this._createBlueDartShipment(client, shipmentData);
-        
-        default:
-          throw new AppError(`Shipment creation not implemented for ${partner}`, 501);
+      // Validate partner
+      if (!Object.values(DELIVERY_PARTNERS).includes(partner)) {
+        throw new AppError(`Invalid delivery partner: ${partner}`, 400);
       }
-    } catch (error) {
-      if (error.response) {
+
+      // Get provider for this partner
+      if (!hasProvider(partner)) {
         throw new AppError(
-          `Third-party API error: ${error.response.data?.message || error.message}`,
-          error.response.status || 500
+          `Provider for '${partner}' not implemented`,
+          501
         );
       }
-      throw error;
+
+      const provider = getProvider(partner);
+      
+      // Delegate to provider
+      console.log(`[ThirdPartyAPI] Creating shipment with ${partner} provider`);
+      const result = await provider.createShipment(shipmentData);
+      
+      return result;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      console.error(`[ThirdPartyAPI] Error creating shipment for ${partner}:`, error.message);
+      throw new AppError(
+        `Shipment creation failed for ${partner}: ${error.message}`,
+        500
+      );
     }
   }
 
   /**
-   * Track shipment
-   * @param {String} partner - Delivery partner
-   * @param {String} trackingNumber - AWB/Tracking number
-   * @returns {Object} Tracking information
+   * Track shipment by AWB/tracking number
+   * 
+   * Delegates to the appropriate provider to get tracking information.
+   * 
+   * @param {String} partner - Delivery partner name
+   * @param {String} trackingNumber - AWB or tracking number
+   * @returns {Promise<Object>} Tracking information
+   * @throws {AppError} If partner not supported or tracking fails
+   * 
+   * @example
+   * const tracking = await thirdPartyAPI.trackShipment('delhivery', 'DELHIVERY123456');
    */
   async trackShipment(partner, trackingNumber) {
     try {
-      const client = this._getClient(partner);
-      
-      switch (partner) {
-        case DELIVERY_PARTNERS.FEDEX:
-          return await this._trackFedexShipment(client, trackingNumber);
-        
-        case DELIVERY_PARTNERS.BLUE_DART:
-        case DELIVERY_PARTNERS.BLUEDART:
-          return await this._trackBlueDartShipment(client, trackingNumber);
-        
-        default:
-          throw new AppError(`Shipment tracking not implemented for ${partner}`, 501);
+      // Validate partner
+      if (!Object.values(DELIVERY_PARTNERS).includes(partner)) {
+        throw new AppError(`Invalid delivery partner: ${partner}`, 400);
       }
-    } catch (error) {
-      if (error.response) {
+
+      // Get provider for this partner
+      if (!hasProvider(partner)) {
         throw new AppError(
-          `Third-party API error: ${error.response.data?.message || error.message}`,
-          error.response.status || 500
+          `Provider for '${partner}' not implemented`,
+          501
         );
       }
-      throw error;
+
+      const provider = getProvider(partner);
+      
+      // Delegate to provider
+      console.log(`[ThirdPartyAPI] Tracking shipment with ${partner} provider: ${trackingNumber}`);
+      const result = await provider.trackShipment(trackingNumber);
+      
+      return result;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      console.error(`[ThirdPartyAPI] Error tracking shipment for ${partner}:`, error.message);
+      throw new AppError(
+        `Tracking failed for ${partner}: ${error.message}`,
+        500
+      );
     }
   }
 
   /**
-   * Check serviceability (pincode check)
-   * @param {String} partner - Delivery partner
-   * @param {Object} serviceabilityData - Source and destination pincodes
-   * @returns {Object} Serviceability information
+   * Check serviceability (pincode serviceability)
+   * 
+   * Checks if delivery is possible from origin to destination pincode.
+   * 
+   * @param {String} partner - Delivery partner name
+   * @param {Object} serviceabilityData - Serviceability check data
+   * @param {String} serviceabilityData.fromPincode - Origin pincode
+   * @param {String} serviceabilityData.toPincode - Destination pincode
+   * @returns {Promise<Object>} Serviceability information
+   * @throws {AppError} If partner not supported or check fails
    */
   async checkServiceability(partner, serviceabilityData) {
     try {
-      const client = this._getClient(partner);
-      
-      switch (partner) {
-        case DELIVERY_PARTNERS.FEDEX:
-          return await this._checkFedexServiceability(client, serviceabilityData);
-        
-        case DELIVERY_PARTNERS.BLUE_DART:
-        case DELIVERY_PARTNERS.BLUEDART:
-          return await this._checkBlueDartServiceability(client, serviceabilityData);
-        
-        default:
-          throw new AppError(`Serviceability check not implemented for ${partner}`, 501);
+      // Validate partner
+      if (!Object.values(DELIVERY_PARTNERS).includes(partner)) {
+        throw new AppError(`Invalid delivery partner: ${partner}`, 400);
       }
-    } catch (error) {
-      if (error.response) {
+
+      // Get provider for this partner
+      if (!hasProvider(partner)) {
         throw new AppError(
-          `Third-party API error: ${error.response.data?.message || error.message}`,
-          error.response.status || 500
+          `Provider for '${partner}' not implemented`,
+          501
         );
       }
-      throw error;
-    }
-  }
 
-  // Private helper methods for each partner
-
-  async _calculateFedexRate(client, rateData) {
-    // TODO: Implement FedEx rate calculation
-    const response = await client.post('/rate/v1/rates/quotes', rateData);
-    return response.data;
-  }
-
-  async _calculateBlueDartRate(client, rateData) {
-    try {
-      // Blue Dart rate calculation format
-      const blueDartPayload = {
-        FromPincode: rateData.from.pincode,
-        ToPincode: rateData.to.pincode,
-        Weight: rateData.weight || 0.5,
-        ProductCode: 'A' // Standard product code
-      };
-
-      const response = await client.post('/rate/calculate', blueDartPayload);
+      const provider = getProvider(partner);
       
-      // Extract rate from response
-      return {
-        baseRate: response.data?.BaseRate || response.data?.ShippingCharge || 30.00,
-        additionalCharges: response.data?.AdditionalCharges || response.data?.Surcharge || 2.50,
-        gst: response.data?.GST || response.data?.Tax || 5.94,
-        dph: response.data?.DPH || response.data?.FuelSurcharge || 0.46,
-        totalAmount: response.data?.TotalAmount || response.data?.FinalAmount || 35.50,
-        estimatedDelivery: response.data?.EstimatedDays || '1 days',
-        currency: 'INR',
-        metadata: response.data
-      };
-    } catch (error) {
-      // If API call fails, return mock data for development
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('Blue Dart rate API unavailable, using mock data:', error.message);
-        // Calculate mock rate based on distance and weight
-        const baseRate = 30.00 + (rateData.weight || 0.5) * 5;
-        const additionalCharges = 2.50;
-        const gst = (baseRate + additionalCharges) * 0.18;
-        const dph = 0.46;
-        const totalAmount = baseRate + additionalCharges + gst + dph;
-        
-        return {
-          baseRate,
-          additionalCharges,
-          gst,
-          dph,
-          totalAmount,
-          estimatedDelivery: '1 days',
-          currency: 'INR',
-          metadata: { mock: true }
-        };
-      }
-      throw error;
-    }
-  }
-
-  async _createFedexShipment(client, shipmentData) {
-    // TODO: Implement FedEx shipment creation
-    const response = await client.post('/ship/v1/shipments', shipmentData);
-    return response.data;
-  }
-
-  async _createBlueDartShipment(client, shipmentData) {
-    // Blue Dart shipment creation format
-    const blueDartPayload = {
-      ConsigneeName: shipmentData.delivery.name,
-      ConsigneeAddress: shipmentData.delivery.address,
-      ConsigneeCity: shipmentData.delivery.city,
-      ConsigneeState: shipmentData.delivery.state,
-      ConsigneePincode: shipmentData.delivery.pincode,
-      ConsigneeMobile: shipmentData.delivery.phone,
-      ShipperName: shipmentData.pickup.name,
-      ShipperAddress: shipmentData.pickup.address,
-      ShipperCity: shipmentData.pickup.city,
-      ShipperState: shipmentData.pickup.state,
-      ShipperPincode: shipmentData.pickup.pincode,
-      ShipperMobile: shipmentData.pickup.phone,
-      ProductCode: 'A', // Standard product code
-      Weight: shipmentData.package.weight || 0.5,
-      DeclaredValue: shipmentData.package.declaredValue || 0,
-      ReferenceNo: shipmentData.orderId || '',
-      Pieces: 1
-    };
-
-    try {
-      const response = await client.post('/shipment/create', blueDartPayload);
+      // Delegate to provider (if implemented)
+      const result = await provider.checkServiceability(
+        serviceabilityData.fromPincode,
+        serviceabilityData.toPincode
+      );
       
-      // Extract AWB and tracking URL from response
-      return {
-        awb: response.data?.AWBNo || response.data?.awb || null,
-        trackingNumber: response.data?.AWBNo || response.data?.awb || null,
-        trackingUrl: response.data?.TrackingURL || `https://www.bluedart.com/track/${response.data?.AWBNo}`,
-        status: response.data?.Status || 'created',
-        partnerOrderId: response.data?.OrderId || null,
-        metadata: response.data
-      };
+      return result;
     } catch (error) {
-      // If API call fails, return mock data for development
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('Blue Dart API unavailable, using mock data:', error.message);
-        return {
-          awb: `BLUEDART${Date.now()}`,
-          trackingNumber: `BLUEDART${Date.now()}`,
-          trackingUrl: `https://www.bluedart.com/track/BLUEDART${Date.now()}`,
-          status: 'created',
-          metadata: { mock: true }
-        };
+      if (error instanceof AppError) {
+        throw error;
       }
-      throw error;
+
+      console.error(`[ThirdPartyAPI] Error checking serviceability for ${partner}:`, error.message);
+      throw new AppError(
+        `Serviceability check failed for ${partner}: ${error.message}`,
+        500
+      );
     }
   }
 
-  async _trackFedexShipment(client, trackingNumber) {
-    // TODO: Implement FedEx tracking
-    const response = await client.get(`/track/v1/trackingnumbers/${trackingNumber}`);
-    return response.data;
+  /**
+   * Get list of available providers
+   * 
+   * @returns {Array} List of provider names
+   */
+  getAvailableProviders() {
+    const { getAllProviders } = require('../providers');
+    return getAllProviders();
   }
 
-  async _trackBlueDartShipment(client, trackingNumber) {
-    // TODO: Implement Blue Dart tracking
-    const response = await client.get(`/tracking/${trackingNumber}`);
-    return response.data;
-  }
-
-  async _checkFedexServiceability(client, serviceabilityData) {
-    // TODO: Implement FedEx serviceability check
-    const response = await client.post('/serviceability/v1/check', serviceabilityData);
-    return response.data;
-  }
-
-  async _checkBlueDartServiceability(client, serviceabilityData) {
-    // TODO: Implement Blue Dart serviceability check
-    const response = await client.post('/serviceability/check', serviceabilityData);
-    return response.data;
+  /**
+   * Check if a provider is available
+   * 
+   * @param {String} partner - Partner name
+   * @returns {Boolean} True if provider is available
+   */
+  isProviderAvailable(partner) {
+    return hasProvider(partner);
   }
 }
 
+// Export singleton instance
 module.exports = new ThirdPartyAPIService();

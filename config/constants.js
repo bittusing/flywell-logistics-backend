@@ -34,6 +34,7 @@ const ORDER_STATUS = {
 
 // Delivery Partners
 const DELIVERY_PARTNERS = {
+  DELHIVERY: 'delhivery',
   FEDEX: 'fedex',
   BLUE_DART: 'blue_dart',
   BLUEDART: 'bluedart'
