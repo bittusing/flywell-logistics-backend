@@ -43,6 +43,20 @@ const userSchema = new mongoose.Schema({
   termsAccepted: {
     type: Boolean,
     default: false
+  },
+  kycStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
+  },
+  kycData: {
+    documentType: String,
+    documentNumber: String,
+    documentImages: [String],
+    submittedAt: Date,
+    approvedAt: Date,
+    rejectedAt: Date,
+    rejectionReason: String
   }
 }, {
   timestamps: true

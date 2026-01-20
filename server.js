@@ -16,6 +16,8 @@ const webhookRoutes = require('./routes/webhook.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const pickupRequestRoutes = require('./routes/pickupRequest.routes');
 const invoiceRoutes = require('./routes/invoice.routes');
+const supportRoutes = require('./routes/support.routes');
+const kycRoutes = require('./routes/kyc.routes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler.middleware');
@@ -37,7 +39,7 @@ connectDB();
 //   origin: function (origin, callback) {
 //     // Allow requests with no origin (like mobile apps or curl requests)
 //     if (!origin) return callback(null, true);
-    
+
 //     // Check if origin is in allowed list
 //     if (allowedOrigins.indexOf(origin) !== -1) {
 //       callback(null, true);
@@ -57,18 +59,18 @@ connectDB();
 
 
 app.use(cors({
-    origin: [
-      'http://localhost:3000',
-  'https://flywell-logistics.vercel.app',
-    ]
-  }))
+  origin: [
+    'http://localhost:3000',
+    'https://flywell-logistics.vercel.app',
+  ]
+}))
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check route
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+  res.status(200).json({
+    status: 'OK',
     message: 'OneDelivery API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
@@ -83,11 +85,13 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/pickup-requests', pickupRequestRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/kyc', kycRoutes);
 
 // 404 handler - must be after all routes
 app.use((req, res) => {
-  res.status(404).json({ 
-    success: false, 
+  res.status(404).json({
+    success: false,
     message: 'Route not found',
     path: req.originalUrl
   });

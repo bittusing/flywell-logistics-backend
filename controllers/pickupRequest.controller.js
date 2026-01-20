@@ -39,7 +39,8 @@ class PickupRequestController {
         endDate: req.query.endDate,
         search: req.query.search,
         limit: req.query.limit,
-        skip: req.query.skip
+        skip: req.query.skip,
+        type: req.query.type || req.query.orderType
       };
 
       const pickupRequests = await pickupRequestService.getUserPickupRequests(userId, filters);
@@ -72,9 +73,9 @@ class PickupRequestController {
   async getAvailableOrders(req, res, next) {
     try {
       const userId = req.user._id;
-      const { location } = req.query;
+      const { location, orderType } = req.query;
 
-      const orders = await pickupRequestService.getAvailableOrdersForPickup(userId, location);
+      const orders = await pickupRequestService.getAvailableOrdersForPickup(userId, location, orderType);
 
       return successResponse(res, { orders }, 'Available orders retrieved successfully');
     } catch (error) {
@@ -88,8 +89,9 @@ class PickupRequestController {
   async getPickupLocations(req, res, next) {
     try {
       const userId = req.user._id;
+      const { orderType } = req.query;
 
-      const locations = await pickupRequestService.getPickupLocations(userId);
+      const locations = await pickupRequestService.getPickupLocations(userId, orderType);
 
       return successResponse(res, { locations }, 'Pickup locations retrieved successfully');
     } catch (error) {

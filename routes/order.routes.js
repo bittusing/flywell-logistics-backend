@@ -3,6 +3,7 @@ const orderController = require('../controllers/order.controller');
 const { createOrderValidation, calculateRateValidation } = require('../validators/order.validator');
 const validate = require('../middleware/validate.middleware');
 const { protect } = require('../middleware/auth.middleware');
+const { requireKYC } = require('../middleware/kyc.middleware');
 
 const router = express.Router();
 
@@ -23,11 +24,12 @@ router.post(
 
 /**
  * @route   POST /api/orders
- * @desc    Create delivery order
+ * @desc    Create delivery order (requires KYC)
  * @access  Private
  */
 router.post(
   '/',
+  requireKYC,
   createOrderValidation,
   validate,
   orderController.createOrder.bind(orderController)

@@ -11,8 +11,9 @@ class DashboardController {
   async getStats(req, res, next) {
     try {
       const userId = req.user._id;
-      const stats = await dashboardService.getStats(userId);
-      
+      const { type = 'domestic' } = req.query;
+      const stats = await dashboardService.getStats(userId, type);
+
       return successResponse(res, stats, 'Dashboard statistics retrieved successfully');
     } catch (error) {
       next(error);
@@ -25,10 +26,10 @@ class DashboardController {
   async getUpcomingPickups(req, res, next) {
     try {
       const userId = req.user._id;
-      const { limit = 10 } = req.query;
-      
-      const pickups = await dashboardService.getUpcomingPickups(userId, parseInt(limit));
-      
+      const { limit = 10, type = 'domestic' } = req.query;
+
+      const pickups = await dashboardService.getUpcomingPickups(userId, parseInt(limit), type);
+
       return successResponse(res, { pickups }, 'Upcoming pickups retrieved successfully');
     } catch (error) {
       next(error);
@@ -41,10 +42,10 @@ class DashboardController {
   async getPerformanceData(req, res, next) {
     try {
       const userId = req.user._id;
-      const { period = '14' } = req.query; // days
-      
-      const data = await dashboardService.getPerformanceData(userId, parseInt(period));
-      
+      const { period = '14', type = 'domestic' } = req.query; // days
+
+      const data = await dashboardService.getPerformanceData(userId, parseInt(period), type);
+
       return successResponse(res, { data }, 'Performance data retrieved successfully');
     } catch (error) {
       next(error);

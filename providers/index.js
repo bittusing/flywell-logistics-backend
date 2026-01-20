@@ -9,6 +9,7 @@
  */
 
 const DelhiveryProvider = require('./delhivery.provider');
+const OverseasLogisticProvider = require('./overseaslogistic.provider');
 // const BlueDartProvider = require('./bluedart.provider');
 // const FedexProvider = require('./fedex.provider');
 
@@ -18,6 +19,7 @@ const DelhiveryProvider = require('./delhivery.provider');
  */
 const PROVIDERS = {
   delhivery: new DelhiveryProvider(),
+  overseas_logistic: new OverseasLogisticProvider(),
   // blue_dart: new BlueDartProvider(),
   // bluedart: new BlueDartProvider(),
   // fedex: new FedexProvider()
@@ -31,14 +33,14 @@ const PROVIDERS = {
  */
 function getProvider(partnerName) {
   const provider = PROVIDERS[partnerName];
-  
+
   if (!provider) {
     const availableProviders = Object.keys(PROVIDERS).join(', ');
     throw new Error(
       `Provider '${partnerName}' not found. Available providers: ${availableProviders}`
     );
   }
-  
+
   return provider;
 }
 

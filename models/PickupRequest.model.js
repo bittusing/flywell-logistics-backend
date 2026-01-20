@@ -14,6 +14,12 @@ const pickupRequestSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  orderType: {
+    type: String,
+    enum: ['domestic', 'international'],
+    default: 'domestic',
+    required: true
+  },
   pickupId: {
     type: String,
     unique: true,
@@ -73,7 +79,7 @@ const pickupRequestSchema = new mongoose.Schema({
 });
 
 // Generate pickup ID before saving
-pickupRequestSchema.pre('save', async function(next) {
+pickupRequestSchema.pre('save', async function (next) {
   if (!this.pickupId) {
     const timestamp = Date.now();
     const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');

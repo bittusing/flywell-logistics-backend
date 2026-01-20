@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 const { ORDER_STATUS, DELIVERY_PARTNERS } = require('../config/constants');
 
+// Order types
+const ORDER_TYPES = {
+  DOMESTIC: 'domestic',
+  INTERNATIONAL: 'international'
+};
+
 const orderSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -12,23 +18,46 @@ const orderSchema = new mongoose.Schema({
     unique: true,
     required: true
   },
-  // Pickup Details
+  // Order type - domestic or international
+  orderType: {
+    type: String,
+    enum: Object.values(ORDER_TYPES),
+    default: ORDER_TYPES.DOMESTIC
+  },
+  // Pickup Details (Sender)
   pickupDetails: {
     name: { type: String, required: true },
+    companyName: { type: String, default: '' },
+    contactPerson: { type: String, default: '' },
     phone: { type: String, required: true },
+    email: { type: String, default: '' },
     address: { type: String, required: true },
+    addressLine2: { type: String, default: '' },
+    addressLine3: { type: String, default: '' },
     pincode: { type: String, required: true },
     city: { type: String, required: true },
-    state: { type: String, required: true }
+    state: { type: String, required: true },
+    country: { type: String, default: 'IN' },
+    // KYC for international
+    kycType: { type: String, default: '' },
+    kycNo: { type: String, default: '' },
+    gstin: { type: String, default: '' }
   },
-  // Delivery Details
+  // Delivery Details (Receiver) - supports international addresses
   deliveryDetails: {
     name: { type: String, required: true },
+    companyName: { type: String, default: '' },
+    contactPerson: { type: String, default: '' },
     phone: { type: String, required: true },
+    email: { type: String, default: '' },
     address: { type: String, required: true },
-    pincode: { type: String, required: true },
+    addressLine2: { type: String, default: '' },
+    addressLine3: { type: String, default: '' },
+    pincode: { type: String, required: true },  // or zipcode for international
     city: { type: String, required: true },
-    state: { type: String, required: true }
+    state: { type: String, required: true },
+    country: { type: String, default: 'IN' },  // Country code for international
+    vatId: { type: String, default: '' }  // For international
   },
   // Package Details
   packageDetails: {
@@ -93,7 +122,7 @@ const orderSchema = new mongoose.Schema({
 });
 
 // Generate order number before saving (fallback if not provided)
-orderSchema.pre('save', async function(next) {
+orderSchema.pre('save', async function (next) {
   if (!this.orderNumber) {
     const timestamp = Date.now();
     const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');

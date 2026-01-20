@@ -40,33 +40,21 @@ const signupValidation = [
 ];
 
 /**
- * Validation rules for user login
+ * Validation rules for user login (email only)
  */
 const loginValidation = [
   body('email')
-    .optional()
     .isEmail()
     .withMessage('Please provide a valid email')
-    .normalizeEmail(),
-  
-  body('phone')
-    .optional()
-    .matches(/^[0-9]{10}$/)
-    .withMessage('Please provide a valid 10-digit phone number'),
+    .normalizeEmail()
+    .notEmpty()
+    .withMessage('Email is required'),
   
   body('password')
     .notEmpty()
     .withMessage('Password is required')
     .isLength({ min: 1 })
-    .withMessage('Password cannot be empty'),
-  
-  body()
-    .custom((value) => {
-      if (!value.email && !value.phone) {
-        throw new Error('Please provide either email or phone number');
-      }
-      return true;
-    })
+    .withMessage('Password cannot be empty')
 ];
 
 module.exports = {

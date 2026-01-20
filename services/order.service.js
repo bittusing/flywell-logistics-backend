@@ -63,7 +63,7 @@ class OrderService {
     } catch (error) {
       // If third-party API fails, use fallback calculation
       console.warn('Third-party API failed, using fallback calculation:', error.message);
-      
+
       // Simple fallback: ₹50 base + ₹10 per kg
       const baseRate = 50;
       const weightCharge = packageDetails.weight * 10;
@@ -93,7 +93,8 @@ class OrderService {
       pickupDetails,
       deliveryDetails,
       packageDetails,
-      deliveryPartner
+      deliveryPartner,
+      orderType = 'domestic'
     } = orderData;
 
     // Calculate rate
@@ -114,7 +115,6 @@ class OrderService {
     }
 
     // Generate unique order number
-    // Format: ORD + timestamp + random 4 digits + sequential number
     const timestamp = Date.now();
     const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     const orderCount = await Order.countDocuments();
@@ -125,6 +125,7 @@ class OrderService {
     const order = await Order.create({
       user: userId,
       orderNumber: orderNumber,
+      orderType,
       pickupDetails,
       deliveryDetails,
       packageDetails,
@@ -147,12 +148,13 @@ class OrderService {
       const walletTransaction = await walletService.deductMoney(
         userId,
         pricing.totalAmount,
-        `Payment for order ${order.orderNumber}`,
+        `Payment for ${orderType} order ${order.orderNumber}`,
         order._id,
         null,
         {
           orderNumber: order.orderNumber,
-          deliveryPartner: deliveryPartner
+          deliveryPartner: deliveryPartner,
+          orderType: orderType
         }
       );
 
@@ -174,7 +176,8 @@ class OrderService {
           status: order.status,
           pricing: order.pricing,
           payment: order.payment,
-          createdAt: order.createdAt
+          createdAt: order.createdAt,
+          orderType: order.orderType
         },
         wallet: {
           balance: walletTransaction.wallet.balance
@@ -197,7 +200,8 @@ class OrderService {
         pickup: order.pickupDetails,
         delivery: order.deliveryDetails,
         package: order.packageDetails,
-        orderId: order.orderNumber
+        orderId: order.orderNumber,
+        orderType: order.orderType
       };
 
       const shipment = await thirdPartyAPIService.createShipment(
@@ -227,7 +231,7 @@ class OrderService {
    */
   async getOrderById(orderId, userId) {
     let order;
-    
+
     // Check if orderId is a valid MongoDB ObjectId (24 hex characters)
     if (orderId.match(/^[0-9a-fA-F]{24}$/)) {
       // It's an ObjectId, use findById
@@ -265,6 +269,12 @@ class OrderService {
 
     if (filters.deliveryPartner) {
       query.deliveryPartner = filters.deliveryPartner;
+    }
+
+    if (filters.type) {
+      query.orderType = filters.type;
+    } else if (filters.orderType) {
+      query.orderType = filters.orderType;
     }
 
     const orders = await Order.find(query)

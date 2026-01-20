@@ -17,11 +17,10 @@ class PickupRequestService {
    */
   async createPickupRequest(userId, pickupData) {
     const {
-      pickupLocation,
-      pickupDate,
       pickupSlot,
       orderIds = [],
-      isDefaultSlot = false
+      isDefaultSlot = false,
+      orderType = 'domestic'
     } = pickupData;
 
     // Validate orders belong to user
@@ -67,7 +66,8 @@ class PickupRequestService {
       expectedAWBs: orders.length,
       pickedAWBs: 0,
       status: PICKUP_STATUS.PENDING,
-      isDefaultSlot
+      isDefaultSlot,
+      orderType
     });
 
     // Update orders status to scheduled for pickup
@@ -87,6 +87,11 @@ class PickupRequestService {
    */
   async getUserPickupRequests(userId, filters = {}) {
     const query = { user: userId };
+
+    // Order Type filter (Domestic/International)
+    if (filters.type || filters.orderType) {
+      query.orderType = filters.type || filters.orderType;
+    }
 
     // Status filter
     if (filters.status) {
@@ -160,9 +165,10 @@ class PickupRequestService {
    * @param {String} locationName - Location name
    * @returns {Array} Available orders
    */
-  async getAvailableOrdersForPickup(userId, locationName) {
+  async getAvailableOrdersForPickup(userId, locationName, orderType = 'domestic') {
     const orders = await Order.find({
       user: userId,
+      orderType,
       'pickupDetails.name': { $regex: locationName, $options: 'i' },
       status: { $in: [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED] }
     })
@@ -177,9 +183,10 @@ class PickupRequestService {
    * @param {String} userId - User ID
    * @returns {Array} Unique pickup locations
    */
-  async getPickupLocations(userId) {
+  async getPickupLocations(userId, orderType = 'domestic') {
     const orders = await Order.find({
       user: userId,
+      orderType,
       status: { $in: [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED] }
     })
       .select('pickupDetails')
@@ -190,6 +197,7 @@ class PickupRequestService {
       {
         $match: {
           user: new mongoose.Types.ObjectId(userId),
+          orderType,
           status: { $in: [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED] }
         }
       },

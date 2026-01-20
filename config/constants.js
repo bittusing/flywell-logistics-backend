@@ -14,6 +14,12 @@ const HTTP_STATUS = {
   INTERNAL_SERVER_ERROR: 500
 };
 
+// Order Types (Domestic vs International)
+const ORDER_TYPES = {
+  DOMESTIC: 'domestic',
+  INTERNATIONAL: 'international'
+};
+
 // User Roles
 const USER_ROLES = {
   USER: 'user',
@@ -37,7 +43,8 @@ const DELIVERY_PARTNERS = {
   DELHIVERY: 'delhivery',
   FEDEX: 'fedex',
   BLUE_DART: 'blue_dart',
-  BLUEDART: 'bluedart'
+  BLUEDART: 'bluedart',
+  OVERSEAS_LOGISTIC: 'overseas_logistic'
 };
 
 // Transaction Types
@@ -48,6 +55,7 @@ const TRANSACTION_TYPES = {
 
 module.exports = {
   HTTP_STATUS,
+  ORDER_TYPES,
   USER_ROLES,
   ORDER_STATUS,
   DELIVERY_PARTNERS,

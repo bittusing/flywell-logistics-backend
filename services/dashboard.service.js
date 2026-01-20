@@ -8,26 +8,27 @@ class DashboardService {
   /**
    * Get dashboard statistics
    * @param {String} userId - User ID
+   * @param {String} orderType - domestic or international
    * @returns {Object} Dashboard statistics
    */
-  async getStats(userId) {
-    const orders = await Order.find({ user: userId });
+  async getStats(userId, orderType = 'domestic') {
+    const orders = await Order.find({ user: userId, orderType });
 
     // Calculate statistics
     const totalShipments = orders.length;
     const deliveredShipments = orders.filter(o => o.status === ORDER_STATUS.DELIVERED).length;
-    const deliveredPercentage = totalShipments > 0 
+    const deliveredPercentage = totalShipments > 0
       ? ((deliveredShipments / totalShipments) * 100).toFixed(0)
       : 0;
-    
+
     // Calculate total revenue from delivered orders
     const totalRevenue = orders
       .filter(o => o.status === ORDER_STATUS.DELIVERED)
       .reduce((sum, o) => sum + (o.pricing?.totalAmount || 0), 0);
-    
+
     // RTO (Return to Origin) orders
     const rtoOrders = orders.filter(o => o.status === ORDER_STATUS.RTO).length;
-    const rtoPercentage = totalShipments > 0 
+    const rtoPercentage = totalShipments > 0
       ? ((rtoOrders / totalShipments) * 100).toFixed(0)
       : 0;
 
@@ -45,11 +46,13 @@ class DashboardService {
    * Get upcoming pickups
    * @param {String} userId - User ID
    * @param {Number} limit - Number of pickups to return
+   * @param {String} orderType - domestic or international
    * @returns {Array} Upcoming pickups
    */
-  async getUpcomingPickups(userId, limit = 10) {
+  async getUpcomingPickups(userId, limit = 10, orderType = 'domestic') {
     const pickups = await Order.find({
       user: userId,
+      orderType,
       status: { $in: [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED] }
     })
       .sort({ createdAt: -1 })
@@ -76,9 +79,10 @@ class DashboardService {
    * Get performance graph data
    * @param {String} userId - User ID
    * @param {Number} period - Number of days
+   * @param {String} orderType - domestic or international
    * @returns {Array} Performance data points
    */
-  async getPerformanceData(userId, period = 14) {
+  async getPerformanceData(userId, period = 14, orderType = 'domestic') {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - period);
@@ -86,13 +90,14 @@ class DashboardService {
     // Get orders in the date range
     const orders = await Order.find({
       user: userId,
+      orderType,
       createdAt: { $gte: startDate, $lte: endDate }
     });
 
     // Group by date
     const dataMap = {};
     const dates = [];
-    
+
     for (let i = period - 1; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
@@ -103,9 +108,9 @@ class DashboardService {
 
     // Count orders per day
     orders.forEach(order => {
-      const dateStr = new Date(order.createdAt).toLocaleDateString('en-IN', { 
-        day: '2-digit', 
-        month: 'short' 
+      const dateStr = new Date(order.createdAt).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short'
       });
       if (dataMap[dateStr] !== undefined) {
         dataMap[dateStr]++;

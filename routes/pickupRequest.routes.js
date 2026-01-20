@@ -2,16 +2,17 @@ const express = require('express');
 const router = express.Router();
 const pickupRequestController = require('../controllers/pickupRequest.controller');
 const { protect } = require('../middleware/auth.middleware');
+const { requireKYC } = require('../middleware/kyc.middleware');
 
 // All routes require authentication
 router.use(protect);
 
 /**
  * @route   POST /api/pickup-requests
- * @desc    Create pickup request
+ * @desc    Create pickup request (requires KYC)
  * @access  Private
  */
-router.post('/', pickupRequestController.createPickupRequest.bind(pickupRequestController));
+router.post('/', requireKYC, pickupRequestController.createPickupRequest.bind(pickupRequestController));
 
 /**
  * @route   GET /api/pickup-requests

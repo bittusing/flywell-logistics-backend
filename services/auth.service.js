@@ -59,25 +59,24 @@ class AuthService {
   }
 
   /**
-   * Login user
+   * Login user (email only)
    * @param {Object} credentials - Login credentials
    * @returns {Object} User and token
    */
   async login(credentials) {
-    const { email, phone, password } = credentials;
+    const { email, password } = credentials;
 
-    // Build query for email or phone
-    const query = email 
-      ? { email: email.toLowerCase() } 
-      : { phone };
+    if (!email) {
+      throw new AppError('Email is required', 400);
+    }
 
     // Find user with password field
-    const user = await User.findOne(query)
+    const user = await User.findOne({ email: email.toLowerCase() })
       .select('+password')
       .populate('wallet');
 
     if (!user) {
-      throw new AppError('Invalid credentials', 401);
+      throw new AppError('Invalid email or password', 401);
     }
 
     // Check if user is active
@@ -88,7 +87,7 @@ class AuthService {
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      throw new AppError('Invalid credentials', 401);
+      throw new AppError('Invalid email or password', 401);
     }
 
     // Generate token
@@ -101,7 +100,8 @@ class AuthService {
         email: user.email,
         phone: user.phone,
         wallet: user.wallet?._id || null,
-        role: user.role
+        role: user.role,
+        kycStatus: user.kycStatus
       },
       token
     };
@@ -126,6 +126,7 @@ class AuthService {
       phone: user.phone,
       wallet: user.wallet?._id || null,
       role: user.role,
+      kycStatus: user.kycStatus,
       balance: user.wallet?.balance || 0
     };
   }

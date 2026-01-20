@@ -13,13 +13,16 @@ class OrderController {
     try {
       const rateData = {
         deliveryPartner: req.body.deliveryPartner,
+        orderType: req.body.orderType || 'domestic',
         pickupDetails: {
           pincode: req.body.pickupPincode,
+          country: req.body.pickupCountry || 'India',
           city: req.body.pickupCity || '',
           state: req.body.pickupState || ''
         },
         deliveryDetails: {
           pincode: req.body.deliveryPincode,
+          country: req.body.deliveryCountry || 'India',
           city: req.body.deliveryCity || '',
           state: req.body.deliveryState || ''
         },
@@ -91,6 +94,8 @@ class OrderController {
       const filters = {
         status: req.query.status,
         deliveryPartner: req.query.deliveryPartner,
+        type: req.query.type,
+        orderType: req.query.orderType,
         limit: parseInt(req.query.limit) || 50,
         skip: parseInt(req.query.skip) || 0
       };
