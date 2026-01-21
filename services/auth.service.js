@@ -52,7 +52,8 @@ class AuthService {
         name: user.name,
         email: user.email,
         phone: user.phone,
-        wallet: wallet._id
+        wallet: wallet._id,
+        kycStatus: user.kycStatus || 'not_started'
       },
       token
     };

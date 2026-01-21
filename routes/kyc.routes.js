@@ -1,16 +1,36 @@
 const express = require('express');
 const kycController = require('../controllers/kyc.controller');
-const { authenticate } = require('../middleware/auth.middleware');
-const { requireKYC } = require('../middleware/kyc.middleware');
+const { protect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
 // All routes require authentication
-// router.use(authenticate);
+router.use(protect);
+
+/**
+ * @route   POST /api/kyc/aadhaar/send-otp
+ * @desc    Send OTP to Aadhaar registered mobile
+ * @access  Private
+ */
+router.post('/aadhaar/send-otp', kycController.sendAadhaarOTP);
+
+/**
+ * @route   POST /api/kyc/aadhaar/verify-otp
+ * @desc    Verify Aadhaar OTP and complete KYC
+ * @access  Private
+ */
+router.post('/aadhaar/verify-otp', kycController.verifyAadhaarOTP);
+
+/**
+ * @route   POST /api/kyc/pan/verify
+ * @desc    Verify PAN and complete KYC
+ * @access  Private
+ */
+router.post('/pan/verify', kycController.verifyPAN);
 
 /**
  * @route   POST /api/kyc/submit
- * @desc    Submit KYC documents
+ * @desc    Submit KYC documents (legacy)
  * @access  Private
  */
 router.post('/submit', kycController.submitKYC);
