@@ -7,19 +7,61 @@ const axios = require('axios');
  */
 class KYCService {
   constructor() {
-    // Use SANDBOX_ENVIRONMENT if set, otherwise determine from API key
-    const environment = process.env.SANDBOX_ENVIRONMENT;
-    
     this.baseURL = 'https://api.sandbox.co.in';
-    
     this.apiKey = process.env.SANDBOX_API_KEY;
     this.apiSecret = process.env.SANDBOX_API_SECRET;
+    this.apiVersion = '1.0';
+    this.accessToken = null;
+    this.tokenExpiry = null;
     
     console.log('KYC Service initialized:', {
       baseURL: this.baseURL,
-      apiKeyPrefix: this.apiKey?.substring(0, 15) + '...',
-      environment
+      apiKeyPrefix: this.apiKey?.substring(0, 15) + '...'
     });
+  }
+
+  /**
+   * Authenticate and get access token
+   * @returns {String} Access token
+   */
+  async getAccessToken() {
+    try {
+      // Return cached token if still valid
+      if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
+        return this.accessToken;
+      }
+
+      if (!this.apiKey || !this.apiSecret) {
+        throw new AppError('Sandbox API credentials not configured', 500);
+      }
+
+      console.log('Authenticating with Sandbox API...');
+
+      const response = await axios.post(
+        `${this.baseURL}/authenticate`,
+        {},
+        {
+          headers: {
+            'x-api-key': this.apiKey,
+            'x-api-secret': this.apiSecret,
+            'x-api-version': this.apiVersion
+          }
+        }
+      );
+
+      this.accessToken = response.data.data.access_token;
+      // Set token expiry to 50 minutes (tokens typically valid for 1 hour)
+      this.tokenExpiry = Date.now() + (50 * 60 * 1000);
+
+      console.log('Authentication successful, token obtained');
+      return this.accessToken;
+    } catch (error) {
+      console.error('Authentication Error:', error.response?.data || error.message);
+      throw new AppError(
+        'Failed to authenticate with KYC service',
+        error.response?.status || 500
+      );
+    }
   }
   /**
    * Send OTP to Aadhaar number
@@ -28,13 +70,10 @@ class KYCService {
    */
   async sendAadhaarOTP(aadhaarNumber) {
     try {
-      if (!this.apiKey || !this.apiSecret) {
-        throw new AppError('Sandbox API credentials not configured', 500);
-      }
+      const accessToken = await this.getAccessToken();
 
       console.log('Sending Aadhaar OTP:', {
         url: `${this.baseURL}/kyc/aadhaar/okyc/otp`,
-        apiKeyPrefix: this.apiKey?.substring(0, 15) + '...',
         aadhaarMasked: '****' + aadhaarNumber.slice(-4)
       });
 
@@ -44,27 +83,28 @@ class KYCService {
           '@entity': 'in.co.sandbox.kyc.aadhaar.okyc.otp.request',
           aadhaar_number: aadhaarNumber,
           consent: 'Y',
-          reason: 'KYC verification for shipping account'
+          reason: 'for kyc'
         },
         {
           headers: {
-            'Authorization': this.apiKey,
+            'Authorization': accessToken,
             'x-api-key': this.apiKey,
-            'x-api-secret': this.apiSecret,
             'Content-Type': 'application/json'
           }
         }
       );
 
+      // Ensure reference_id is returned as string
+      const referenceId = String(response.data.data.reference_id);
+
       return {
         success: true,
-        referenceId: response.data.data.reference_id,
-        message: response.data.data.message
+        referenceId: referenceId,
+        message: response.data.data.message || 'OTP sent successfully'
       };
     } catch (error) {
       console.error('Aadhaar OTP Error:', error.response?.data || error.message);
       
-      // Handle specific error cases
       let errorMessage = 'Failed to send OTP to Aadhaar number';
       
       if (error.response?.data?.code === 403) {
@@ -88,22 +128,29 @@ class KYCService {
    */
   async verifyAadhaarOTP(referenceId, otp) {
     try {
-      if (!this.apiKey || !this.apiSecret) {
-        throw new AppError('Sandbox API credentials not configured', 500);
-      }
+      const accessToken = await this.getAccessToken();
+
+      // Ensure referenceId and otp are strings
+      const refId = String(referenceId);
+      const otpStr = String(otp);
+
+      console.log('Verifying Aadhaar OTP:', {
+        url: `${this.baseURL}/kyc/aadhaar/okyc/otp/verify`,
+        referenceId: refId,
+        otpLength: otpStr.length
+      });
 
       const response = await axios.post(
         `${this.baseURL}/kyc/aadhaar/okyc/otp/verify`,
         {
           '@entity': 'in.co.sandbox.kyc.aadhaar.okyc.request',
-          reference_id: referenceId,
-          otp: otp
+          reference_id: refId,
+          otp: otpStr
         },
         {
           headers: {
-            'Authorization': this.apiKey,
+            'Authorization': accessToken,
             'x-api-key': this.apiKey,
-            'x-api-secret': this.apiSecret,
             'Content-Type': 'application/json'
           }
         }
@@ -133,15 +180,18 @@ class KYCService {
   /**
    * Verify PAN Card
    * @param {String} pan - PAN number
-   * @param {String} nameAsPer PAN - Name as per PAN
-   * @param {String} dateOfBirth - Date of birth (DD-MM-YYYY)
+   * @param {String} nameAsPerPAN - Name as per PAN
+   * @param {String} dateOfBirth - Date of birth (DD/MM/YYYY)
    * @returns {Object} PAN verification data
    */
   async verifyPAN(pan, nameAsPerPAN, dateOfBirth) {
     try {
-      if (!this.apiKey || !this.apiSecret) {
-        throw new AppError('Sandbox API credentials not configured', 500);
-      }
+      const accessToken = await this.getAccessToken();
+
+      console.log('Verifying PAN:', {
+        url: `${this.baseURL}/kyc/pan/verify`,
+        panMasked: pan.substring(0, 3) + '****' + pan.slice(-1)
+      });
 
       const response = await axios.post(
         `${this.baseURL}/kyc/pan/verify`,
@@ -151,13 +201,12 @@ class KYCService {
           name_as_per_pan: nameAsPerPAN,
           date_of_birth: dateOfBirth,
           consent: 'Y',
-          reason: 'KYC verification for shipping account'
+          reason: 'for kyc'
         },
         {
           headers: {
-            'Authorization': this.apiKey,
+            'Authorization': accessToken,
             'x-api-key': this.apiKey,
-            'x-api-secret': this.apiSecret,
             'Content-Type': 'application/json'
           }
         }
