@@ -141,19 +141,25 @@ class BaseProvider {
   handleError(error, operation) {
     if (error.response) {
       const status = error.response.status;
-      const message = error.response.data?.message || 
-                     error.response.data?.detail || 
-                     error.response.data?.error ||
+      const data = error.response.data;
+      const message = data?.message || 
+                     data?.detail || 
+                     data?.error ||
                      error.message;
       
       console.error(`[${this.name}] ${operation} error:`, {
         status,
         message,
-        data: error.response.data
+        data: data
       });
       
+      // Include more details in error message
+      const detailedMessage = data?.errors 
+        ? `${message} - ${JSON.stringify(data.errors)}`
+        : message;
+      
       throw new AppError(
-        `${this.name} API error (${operation}): ${message}`,
+        `${this.name} API error (${operation}): ${detailedMessage}`,
         status
       );
     }

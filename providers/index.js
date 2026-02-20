@@ -10,6 +10,7 @@
 
 const DelhiveryProvider = require('./delhivery.provider');
 const OverseasLogisticProvider = require('./overseaslogistic.provider');
+const NimbusPostProvider = require('./nimbuspost.provider');
 // const BlueDartProvider = require('./bluedart.provider');
 // const FedexProvider = require('./fedex.provider');
 
@@ -18,7 +19,8 @@ const OverseasLogisticProvider = require('./overseaslogistic.provider');
  * Maps partner names to their provider instances
  */
 const PROVIDERS = {
-  delhivery: new DelhiveryProvider(),
+  nimbuspost: new NimbusPostProvider(),
+  // delhivery: new DelhiveryProvider(),
   overseas_logistic: new OverseasLogisticProvider(),
   // blue_dart: new BlueDartProvider(),
   // bluedart: new BlueDartProvider(),

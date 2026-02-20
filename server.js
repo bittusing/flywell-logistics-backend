@@ -18,6 +18,8 @@ const pickupRequestRoutes = require('./routes/pickupRequest.routes');
 const invoiceRoutes = require('./routes/invoice.routes');
 const supportRoutes = require('./routes/support.routes');
 const kycRoutes = require('./routes/kyc.routes');
+const adminRoutes = require('./routes/admin.routes');
+const bankAccountRoutes = require('./routes/bankAccount.routes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler.middleware');
@@ -61,6 +63,7 @@ connectDB();
 app.use(cors({
   origin: [
     'http://localhost:3000',
+    'http://localhost:3001',
     'https://flywell-logistics.vercel.app',
   ]
 }))
@@ -87,6 +90,8 @@ app.use('/api/pickup-requests', pickupRequestRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/kyc', kycRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/bank-account', bankAccountRoutes);
 
 // 404 handler - must be after all routes
 app.use((req, res) => {
