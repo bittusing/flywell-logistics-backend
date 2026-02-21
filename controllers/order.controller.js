@@ -96,6 +96,7 @@ class OrderController {
         deliveryPartner: req.query.deliveryPartner,
         type: req.query.type,
         orderType: req.query.orderType,
+        search: req.query.search,
         limit: parseInt(req.query.limit) || 50,
         skip: parseInt(req.query.skip) || 0
       };

@@ -277,6 +277,14 @@ class OrderService {
       query.orderType = filters.orderType;
     }
 
+    // Search by order number or AWB
+    if (filters.search) {
+      query.$or = [
+        { orderNumber: { $regex: filters.search, $options: 'i' } },
+        { awb: { $regex: filters.search, $options: 'i' } }
+      ];
+    }
+
     const orders = await Order.find(query)
       .sort({ createdAt: -1 })
       .limit(filters.limit || 50)

@@ -29,4 +29,14 @@ router.get('/customers/top', adminController.getTopCustomers);
 // Payments
 router.get('/payments', adminController.getPaymentTransactions);
 
+// Support Tickets
+router.get('/support/tickets', adminController.getAllSupportTickets);
+router.get('/support/tickets/:ticketId', adminController.getSupportTicketById);
+router.patch('/support/tickets/:ticketId/status', adminController.updateTicketStatus);
+router.post('/support/tickets/:ticketId/reply', adminController.replyToTicket);
+
+// Reports
+const reportsRoutes = require('./reports.routes');
+router.use('/reports', reportsRoutes);
+
 module.exports = router;

@@ -204,6 +204,51 @@ class WalletService {
       }
     };
   }
+
+  /**
+   * Export wallet ledger as CSV
+   * @param {String} userId - User ID
+   * @returns {String} CSV string
+   */
+  async exportLedger(userId) {
+    const wallet = await this.getWalletByUserId(userId);
+    const transactions = wallet.transactions || [];
+
+    // Sort by date (oldest first for ledger)
+    transactions.sort((a, b) => {
+      const dateA = new Date(a.createdAt || a._id?.getTimestamp() || 0);
+      const dateB = new Date(b.createdAt || b._id?.getTimestamp() || 0);
+      return dateA - dateB;
+    });
+
+    // CSV header
+    let csv = 'Date,Transaction ID,Type,Description,Order ID,AWB,Credit,Debit,Balance\n';
+
+    let runningBalance = 0;
+
+    // Add each transaction
+    transactions.forEach(txn => {
+      const date = new Date(txn.createdAt || txn._id?.getTimestamp()).toLocaleString('en-IN');
+      const txnId = txn._id?.toString().substring(0, 8) || 'N/A';
+      const type = txn.type || 'N/A';
+      const description = (txn.description || '').replace(/,/g, ';'); // Replace commas to avoid CSV issues
+      const orderId = txn.orderId ? txn.orderId.toString().substring(0, 8) : '';
+      const awb = txn.awb || '';
+      const credit = txn.type === TRANSACTION_TYPES.CREDIT ? txn.amount : '';
+      const debit = txn.type === TRANSACTION_TYPES.DEBIT ? txn.amount : '';
+
+      // Calculate running balance
+      if (txn.type === TRANSACTION_TYPES.CREDIT) {
+        runningBalance += txn.amount;
+      } else if (txn.type === TRANSACTION_TYPES.DEBIT) {
+        runningBalance -= txn.amount;
+      }
+
+      csv += `"${date}","${txnId}","${type}","${description}","${orderId}","${awb}","${credit}","${debit}","${runningBalance.toFixed(2)}"\n`;
+    });
+
+    return csv;
+  }
 }
 
 module.exports = new WalletService();

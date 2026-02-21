@@ -384,6 +384,40 @@ class NimbusPostProvider extends BaseProvider {
 
     return statusMap[nimbusStatus?.toLowerCase()] || nimbusStatus?.toLowerCase() || 'pending';
   }
+
+
+   /**
+    * Fetch AWB numbers from NimbusPost
+    * @param {Number} quantity - Number of AWBs to fetch
+    * @returns {Promise<Array>} AWB numbers
+    */
+   async fetchAWBNumbers(quantity) {
+     try {
+       const headers = await this.getAuthHeaders();
+       const client = this.getClient();
+
+       console.log(`Fetching ${quantity} AWB numbers from NimbusPost...`);
+
+       const response = await client.post('/courier/awb',
+         { quantity },
+         { headers }
+       );
+
+       if (!response.data.status || !response.data.data) {
+         throw new AppError('Failed to fetch AWB numbers', 400);
+       }
+
+       console.log(`Successfully fetched ${response.data.data.length} AWB numbers`);
+       return response.data.data;
+     } catch (error) {
+       console.error('NimbusPost AWB Fetch Error:', error.response?.data || error.message);
+       throw new AppError(
+         error.response?.data?.message || 'Failed to fetch AWB numbers from NimbusPost',
+         error.response?.status || 500
+       );
+     }
+   }
+
 }
 
 module.exports = NimbusPostProvider;

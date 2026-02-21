@@ -14,18 +14,22 @@ class InvoiceService {
    */
   async getInvoices(userId, filters = {}) {
     const query = { 
-      user: userId,
-      'payment.status': 'completed'
+      user: userId
+      // Removed payment.status filter to show all orders
+      // Users can see which orders have invoices and which don't
     };
 
-    // Date range filter
+    console.log('Invoice Query:', JSON.stringify(query, null, 2));
+    console.log('Filters:', JSON.stringify(filters, null, 2));
+
+    // Date range filter - use createdAt if paidAt is not available
     if (filters.startDate || filters.endDate) {
-      query['payment.paidAt'] = {};
+      query.createdAt = {};
       if (filters.startDate) {
-        query['payment.paidAt'].$gte = new Date(filters.startDate);
+        query.createdAt.$gte = new Date(filters.startDate);
       }
       if (filters.endDate) {
-        query['payment.paidAt'].$lte = new Date(filters.endDate);
+        query.createdAt.$lte = new Date(filters.endDate);
       }
     }
 
@@ -41,27 +45,31 @@ class InvoiceService {
     const skip = parseInt(filters.skip) || 0;
 
     const orders = await Order.find(query)
-      .sort({ 'payment.paidAt': -1 })
+      .sort({ createdAt: -1 })
       .limit(limit)
       .skip(skip);
 
+    console.log(`Found ${orders.length} orders`);
+
     // Generate invoices from orders
-    const invoices = orders.map(order => ({
-      invoiceId: `INV${order.orderNumber}`,
-      orderNumber: order.orderNumber,
-      awb: order.awb,
-      invoiceDate: order.payment.paidAt || order.createdAt,
-      gstNumber: '07KVFPS0396D1Z8', // This should come from user/company profile
-      serviceType: 'Domestic',
-      invoiceAmount: order.pricing.totalAmount,
-      currency: order.pricing.currency || 'INR',
-      orderDetails: {
-        pickup: order.pickupDetails,
-        delivery: order.deliveryDetails,
-        deliveryPartner: order.deliveryPartner
-      },
-      orderId: order._id
-    }));
+    const invoices = orders
+      .filter(order => order.payment.status === 'completed') // Only show completed payments as invoices
+      .map(order => ({
+        invoiceId: `INV${order.orderNumber}`,
+        orderNumber: order.orderNumber,
+        awb: order.awb,
+        invoiceDate: order.payment.paidAt || order.createdAt,
+        gstNumber: '07KVFPS0396D1Z8', // This should come from user/company profile
+        serviceType: order.orderType === 'international' ? 'International' : 'Domestic',
+        invoiceAmount: order.pricing.totalAmount,
+        currency: order.pricing.currency || 'INR',
+        orderDetails: {
+          pickup: order.pickupDetails,
+          delivery: order.deliveryDetails,
+          deliveryPartner: order.deliveryPartner
+        },
+        orderId: order._id
+      }));
 
     return invoices;
   }
@@ -92,7 +100,7 @@ class InvoiceService {
       awb: order.awb,
       invoiceDate: order.payment.paidAt || order.createdAt,
       gstNumber: '07KVFPS0396D1Z8',
-      serviceType: 'Domestic',
+      serviceType: order.orderType === 'international' ? 'International' : 'Domestic',
       invoiceAmount: order.pricing.totalAmount,
       currency: order.pricing.currency || 'INR',
       orderDetails: {

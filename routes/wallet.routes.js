@@ -53,4 +53,14 @@ router.post(
   walletController.verifyPayment.bind(walletController)
 );
 
+/**
+ * @route   GET /api/wallet/ledger/export
+ * @desc    Export wallet ledger as CSV
+ * @access  Private
+ */
+router.get(
+  '/ledger/export',
+  walletController.exportLedger.bind(walletController)
+);
+
 module.exports = router;

@@ -120,6 +120,23 @@ class WalletController {
       next(error);
     }
   }
+
+  /**
+   * Export wallet ledger as CSV
+   * @route GET /api/wallet/ledger/export
+   */
+  async exportLedger(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const csv = await walletService.exportLedger(userId);
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=wallet-ledger-${Date.now()}.csv`);
+      res.send(csv);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new WalletController();

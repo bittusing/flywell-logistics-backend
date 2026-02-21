@@ -442,6 +442,111 @@ class AdminService {
       }
     };
   }
+
+  /**
+   * Get all support tickets (Admin)
+   */
+  async getAllSupportTickets({ status, category, priority, page, limit }) {
+    const SupportTicket = require('../models/SupportTicket.model');
+    
+    const query = {};
+
+    if (status) query.status = status;
+    if (category) query.category = category;
+    if (priority) query.priority = priority;
+
+    const [tickets, total] = await Promise.all([
+      SupportTicket.find(query)
+        .populate('user', 'name email phone')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      SupportTicket.countDocuments(query)
+    ]);
+
+    return {
+      tickets,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  /**
+   * Get support ticket by ID (Admin)
+   */
+  async getSupportTicketById(ticketId) {
+    const SupportTicket = require('../models/SupportTicket.model');
+    
+    const ticket = await SupportTicket.findById(ticketId)
+      .populate('user', 'name email phone');
+
+    if (!ticket) {
+      throw new AppError('Ticket not found', 404);
+    }
+
+    return ticket;
+  }
+
+  /**
+   * Update ticket status (Admin)
+   */
+  async updateTicketStatus(ticketId, status) {
+    const SupportTicket = require('../models/SupportTicket.model');
+    
+    const validStatuses = ['open', 'resolved', 'closed'];
+    if (!validStatuses.includes(status)) {
+      throw new AppError('Invalid status', 400);
+    }
+
+    const ticket = await SupportTicket.findByIdAndUpdate(
+      ticketId,
+      { 
+        status,
+        resolvedAt: status === 'resolved' ? new Date() : undefined,
+        closedAt: status === 'closed' ? new Date() : undefined
+      },
+      { new: true }
+    ).populate('user', 'name email phone');
+
+    if (!ticket) {
+      throw new AppError('Ticket not found', 404);
+    }
+
+    return ticket;
+  }
+
+  /**
+   * Reply to support ticket (Admin)
+   */
+  async replyToTicket(ticketId, adminId, message) {
+    const SupportTicket = require('../models/SupportTicket.model');
+    
+    if (!message || !message.trim()) {
+      throw new AppError('Message is required', 400);
+    }
+
+    const ticket = await SupportTicket.findById(ticketId);
+
+    if (!ticket) {
+      throw new AppError('Ticket not found', 404);
+    }
+
+    ticket.messages.push({
+      message: message.trim(),
+      isAdmin: true,
+      adminId: adminId,
+      createdAt: new Date()
+    });
+
+    await ticket.save();
+
+    return await SupportTicket.findById(ticketId)
+      .populate('user', 'name email phone');
+  }
 }
 
 module.exports = new AdminService();

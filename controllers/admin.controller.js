@@ -182,6 +182,71 @@ class AdminController {
       next(error);
     }
   }
+
+  /**
+   * Get all support tickets
+   * @route GET /api/admin/support/tickets
+   */
+  async getAllSupportTickets(req, res, next) {
+    try {
+      const { status = '', category = '', priority = '', page = 1, limit = 20 } = req.query;
+      const result = await adminService.getAllSupportTickets({
+        status,
+        category,
+        priority,
+        page: parseInt(page),
+        limit: parseInt(limit)
+      });
+      return successResponse(res, result, 'Support tickets retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get support ticket by ID
+   * @route GET /api/admin/support/tickets/:ticketId
+   */
+  async getSupportTicketById(req, res, next) {
+    try {
+      const { ticketId } = req.params;
+      const ticket = await adminService.getSupportTicketById(ticketId);
+      return successResponse(res, { ticket }, 'Ticket details retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Update ticket status
+   * @route PATCH /api/admin/support/tickets/:ticketId/status
+   */
+  async updateTicketStatus(req, res, next) {
+    try {
+      const { ticketId } = req.params;
+      const { status } = req.body;
+      const ticket = await adminService.updateTicketStatus(ticketId, status);
+      return successResponse(res, { ticket }, 'Ticket status updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Reply to support ticket
+   * @route POST /api/admin/support/tickets/:ticketId/reply
+   */
+  async replyToTicket(req, res, next) {
+    try {
+      const { ticketId } = req.params;
+      const { message } = req.body;
+      const adminId = req.user._id;
+      const ticket = await adminService.replyToTicket(ticketId, adminId, message);
+      return successResponse(res, { ticket }, 'Reply sent successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new AdminController();

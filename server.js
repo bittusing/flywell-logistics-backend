@@ -20,6 +20,8 @@ const supportRoutes = require('./routes/support.routes');
 const kycRoutes = require('./routes/kyc.routes');
 const adminRoutes = require('./routes/admin.routes');
 const bankAccountRoutes = require('./routes/bankAccount.routes');
+const pincodeRoutes = require('./routes/pincode.routes');
+const awbRoutes = require('./routes/awb.routes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler.middleware');
@@ -92,6 +94,8 @@ app.use('/api/support', supportRoutes);
 app.use('/api/kyc', kycRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/bank-account', bankAccountRoutes);
+app.use('/api/pincode', pincodeRoutes);
+app.use('/api/awb', awbRoutes);
 
 // 404 handler - must be after all routes
 app.use((req, res) => {
