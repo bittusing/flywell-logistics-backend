@@ -67,6 +67,8 @@ app.use(cors({
     'http://localhost:3000',
     'http://localhost:3001',
     'https://flywell-logistics.vercel.app',
+    'https://admin.flywelllogistics.com',
+    'https://www.flywelllogistics.com',
   ]
 }))
 app.use(express.json({ limit: '10mb' }));
