@@ -1,10 +1,13 @@
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
-// Always load .env from this file's directory (fixes PM2/systemd when cwd ≠ project folder)
-dotenv.config({ path: path.join(__dirname, '.env') });
+// Always load .env next to server.js (PM2 cwd ≠ project folder is OK)
+const envPath = path.join(__dirname, '.env');
+dotenv.config({ path: envPath });
+console.log(`[env] dotenv path: ${envPath} exists=${fs.existsSync(envPath)}`);
 
 const _gId = process.env.GOOGLE_CLIENT_ID;
 if (_gId) {
@@ -12,7 +15,9 @@ if (_gId) {
     `[env] GOOGLE_CLIENT_ID loaded (len=${_gId.length}) ${_gId.slice(0, 8)}...${_gId.slice(-6)}`
   );
 } else {
-  console.warn('[env] GOOGLE_CLIENT_ID missing — Google sign-in will fail until set in .env');
+  console.warn(
+    '[env] GOOGLE_CLIENT_ID missing — add GOOGLE_CLIENT_ID=... to .env on the server OR set it in PM2 / AWS task env. PUBLIC_APP_URL alone is not enough.'
+  );
 }
 
 // Import configurations
