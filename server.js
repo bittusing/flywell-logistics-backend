@@ -1,9 +1,19 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
-// Load environment variables
-dotenv.config();
+// Always load .env from this file's directory (fixes PM2/systemd when cwd ≠ project folder)
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+const _gId = process.env.GOOGLE_CLIENT_ID;
+if (_gId) {
+  console.log(
+    `[env] GOOGLE_CLIENT_ID loaded (len=${_gId.length}) ${_gId.slice(0, 8)}...${_gId.slice(-6)}`
+  );
+} else {
+  console.warn('[env] GOOGLE_CLIENT_ID missing — Google sign-in will fail until set in .env');
+}
 
 // Import configurations
 const connectDB = require('./config/database');
