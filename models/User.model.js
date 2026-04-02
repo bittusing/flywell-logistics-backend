@@ -17,14 +17,39 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
-    match: [/^[0-9]{10}$/, 'Please provide a valid 10-digit phone number']
+    sparse: true,
+    unique: true,
+    trim: true,
+    validate: {
+      validator(value) {
+        return value == null || value === '' || /^[0-9]{10}$/.test(value);
+      },
+      message: 'Please provide a valid 10-digit phone number'
+    }
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters'],
     select: false // Don't return password by default
+  },
+  googleId: {
+    type: String,
+    sparse: true,
+    unique: true,
+    trim: true
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
+  },
+  passwordResetToken: {
+    type: String,
+    select: false
+  },
+  passwordResetExpires: {
+    type: Date,
+    select: false
   },
   wallet: {
     type: mongoose.Schema.Types.ObjectId,
@@ -66,7 +91,7 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
+  if (!this.isModified('password') || !this.password) {
     return next();
   }
   this.password = await bcrypt.hash(this.password, 12);
@@ -75,6 +100,9 @@ userSchema.pre('save', async function(next) {
 
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
+  if (!this.password || !candidatePassword) {
+    return false;
+  }
   return await bcrypt.compare(candidatePassword, this.password);
 };
 

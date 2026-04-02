@@ -68,6 +68,52 @@ class AuthController {
       next(error);
     }
   }
+
+  /**
+   * @route POST /api/auth/google
+   */
+  async googleAuth(req, res, next) {
+    try {
+      const result = await authService.googleAuth(req.body);
+
+      return successResponse(
+        res,
+        {
+          user: result.user,
+          token: result.token
+        },
+        'Signed in with Google successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * @route POST /api/auth/forgot-password
+   */
+  async forgotPassword(req, res, next) {
+    try {
+      const result = await authService.forgotPassword(req.body);
+
+      return successResponse(res, { message: result.message }, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * @route POST /api/auth/reset-password
+   */
+  async resetPassword(req, res, next) {
+    try {
+      const result = await authService.resetPassword(req.body);
+
+      return successResponse(res, { message: result.message }, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new AuthController();

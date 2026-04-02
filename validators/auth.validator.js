@@ -57,7 +57,39 @@ const loginValidation = [
     .withMessage('Password cannot be empty')
 ];
 
+const googleAuthValidation = [
+  body('idToken')
+    .notEmpty()
+    .withMessage('Google credential is required')
+    .isString()
+    .isLength({ min: 10 })
+    .withMessage('Invalid Google credential')
+];
+
+const forgotPasswordValidation = [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail()
+    .notEmpty()
+];
+
+const resetPasswordValidation = [
+  body('token')
+    .notEmpty()
+    .withMessage('Reset token is required')
+    .isString(),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters')
+    .isLength({ max: 128 })
+    .withMessage('Password must not exceed 128 characters')
+];
+
 module.exports = {
   signupValidation,
-  loginValidation
+  loginValidation,
+  googleAuthValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation
 };
