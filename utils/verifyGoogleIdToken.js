@@ -1,46 +1,11 @@
-const fs = require('fs');
-const path = require('path');
-const dotenv = require('dotenv');
 const { OAuth2Client } = require('google-auth-library');
+const { ensureGoogleClientIdLoaded } = require('../config/loadEnv');
 
 /**
- * PM2 / old dotenv often loads .env from process cwd (e.g. /home/ubuntu), not from
- * backend/.env — so GOOGLE_CLIENT_ID stays empty. Read backend/.env via __dirname
- * (always points at this project folder) and merge into process.env.
- */
-function ensureGoogleClientIdFromBackendEnvFile() {
-  if (process.env.GOOGLE_CLIENT_ID) {
-    return;
-  }
-  const envPath = path.join(__dirname, '..', '.env');
-  if (!fs.existsSync(envPath)) {
-    return;
-  }
-  try {
-    const parsed = dotenv.parse(fs.readFileSync(envPath, 'utf8'));
-    const raw = parsed.GOOGLE_CLIENT_ID;
-    if (raw) {
-      process.env.GOOGLE_CLIENT_ID = String(raw)
-        .trim()
-        .replace(/\r/g, '')
-        .replace(/^["']|["']$/g, '');
-      console.log(
-        '[verifyGoogleIdToken] GOOGLE_CLIENT_ID loaded from file:',
-        envPath,
-        `(len=${process.env.GOOGLE_CLIENT_ID.length})`
-      );
-    }
-  } catch (e) {
-    console.error('[verifyGoogleIdToken] Could not parse .env at', envPath, e.message);
-  }
-}
-
-/**
- * OAuth Web Client ID(s) from env — comma-separated if you use more than one
- * (e.g. old + new client, or typo fix) so token `aud` matches one of them.
+ * OAuth Web Client ID(s) from env — comma-separated if you use more than one.
  */
 function getGoogleAudienceList() {
-  ensureGoogleClientIdFromBackendEnvFile();
+  ensureGoogleClientIdLoaded();
 
   const raw = process.env.GOOGLE_CLIENT_ID || '';
   return raw
@@ -82,4 +47,3 @@ async function verifyGoogleIdToken(idToken) {
 
 module.exports = verifyGoogleIdToken;
 module.exports.getGoogleAudienceList = getGoogleAudienceList;
-module.exports.ensureGoogleClientIdFromBackendEnvFile = ensureGoogleClientIdFromBackendEnvFile;

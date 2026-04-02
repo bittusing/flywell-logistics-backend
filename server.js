@@ -1,24 +1,8 @@
-const fs = require('fs');
-const path = require('path');
+// Must run first — loads backend/.env regardless of PM2 cwd
+require('./config/loadEnv');
+
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
-
-// Always load .env next to server.js (PM2 cwd ≠ project folder is OK)
-const envPath = path.join(__dirname, '.env');
-dotenv.config({ path: envPath });
-console.log(`[env] dotenv path: ${envPath} exists=${fs.existsSync(envPath)}`);
-
-const _gId = process.env.GOOGLE_CLIENT_ID;
-if (_gId) {
-  console.log(
-    `[env] GOOGLE_CLIENT_ID loaded (len=${_gId.length}) ${_gId.slice(0, 8)}...${_gId.slice(-6)}`
-  );
-} else {
-  console.warn(
-    '[env] GOOGLE_CLIENT_ID missing — add GOOGLE_CLIENT_ID=... to .env on the server OR set it in PM2 / AWS task env. PUBLIC_APP_URL alone is not enough.'
-  );
-}
 
 // Import configurations
 const connectDB = require('./config/database');
