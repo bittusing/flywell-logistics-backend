@@ -151,6 +151,7 @@ class AuthService {
     try {
       googlePayload = await verifyGoogleIdToken(idToken);
     } catch (err) {
+      console.error('[AuthService] Google ID token verification failed:', err.message);
       throw new AppError('Invalid or expired Google sign-in. Please try again.', 401);
     }
 

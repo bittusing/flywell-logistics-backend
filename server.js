@@ -62,15 +62,29 @@ connectDB();
 // }));
 
 
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'https://flywell-logistics.vercel.app',
-    'https://admin.flywelllogistics.com',
-    'https://www.flywelllogistics.com',
-  ]
-}))  
+const corsStaticOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://flywell-logistics.vercel.app',
+  'https://admin.flywelllogistics.com',
+  'https://www.flywelllogistics.com',
+  'https://flywelllogistics.com',
+  process.env.PUBLIC_APP_URL?.replace(/\/$/, ''),
+  process.env.FRONTEND_URL?.replace(/\/$/, '')
+];
+
+const corsExtraOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
+const allowedOrigins = [...new Set([...corsStaticOrigins, ...corsExtraOrigins].filter(Boolean))];
+
+app.use(
+  cors({
+    origin: allowedOrigins
+  })
+);  
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
