@@ -14,13 +14,18 @@ class OrderService {
    * @returns {Object} Rate information
    */
   async calculateRate(orderData) {
-    const { deliveryPartner, pickupDetails, deliveryDetails, packageDetails } = orderData;
+    const {
+      deliveryPartner,
+      pickupDetails,
+      deliveryDetails,
+      packageDetails,
+      paymentType = 'prepaid'
+    } = orderData;
 
     if (!Object.values(DELIVERY_PARTNERS).includes(deliveryPartner)) {
       throw new AppError('Invalid delivery partner', 400);
     }
 
-    // Prepare rate calculation data
     const rateData = {
       from: {
         pincode: pickupDetails.pincode,
@@ -34,19 +39,21 @@ class OrderService {
       },
       weight: packageDetails.weight,
       dimensions: packageDetails.dimensions,
-      declaredValue: packageDetails.declaredValue || 0
+      declaredValue: packageDetails.declaredValue || 0,
+      paymentType
     };
 
     try {
-      // Get rate from third-party API
       const rateResponse = await thirdPartyAPIService.calculateRate(deliveryPartner, rateData);
 
-      // Map response to our format
       const baseRate = rateResponse.baseRate || rateResponse.rate || rateResponse.amount || 0;
       const additionalCharges = rateResponse.additionalCharges || 0;
       const gst = rateResponse.gst || 0;
       const dph = rateResponse.dph || 0;
-      const totalAmount = rateResponse.totalAmount || (baseRate + additionalCharges + gst + dph);
+      const totalAmount =
+        rateResponse.totalAmount != null
+          ? rateResponse.totalAmount
+          : baseRate + additionalCharges + gst + dph;
 
       return {
         baseRate,
@@ -58,6 +65,9 @@ class OrderService {
         partner: deliveryPartner,
         estimatedDelivery: rateResponse.estimatedDelivery || null,
         serviceType: rateResponse.serviceType || 'standard',
+        courierOptions: rateResponse.courierOptions || [],
+        courierId: rateResponse.courierId,
+        courierName: rateResponse.courierName,
         metadata: rateResponse.metadata || {}
       };
     } catch (error) {
@@ -94,16 +104,86 @@ class OrderService {
       deliveryDetails,
       packageDetails,
       deliveryPartner,
-      orderType = 'domestic'
+      orderType = 'domestic',
+      nimbusCourierId,
+      paymentType = 'prepaid'
     } = orderData;
 
-    // Calculate rate
-    const pricing = await this.calculateRate({
-      deliveryPartner,
-      pickupDetails,
-      deliveryDetails,
-      packageDetails
-    });
+    if (
+      orderType === 'domestic' &&
+      deliveryPartner === DELIVERY_PARTNERS.NIMBUSPOST &&
+      (!nimbusCourierId || String(nimbusCourierId).trim() === '')
+    ) {
+      throw new AppError(
+        'Select a courier option after calculating shipping rate (nimbusCourierId is required).',
+        400
+      );
+    }
+
+    let pricing;
+    let nimbusMeta = {};
+
+    if (
+      orderType === 'domestic' &&
+      deliveryPartner === DELIVERY_PARTNERS.NIMBUSPOST &&
+      nimbusCourierId
+    ) {
+      const rateData = {
+        from: {
+          pincode: pickupDetails.pincode,
+          city: pickupDetails.city,
+          state: pickupDetails.state
+        },
+        to: {
+          pincode: deliveryDetails.pincode,
+          city: deliveryDetails.city,
+          state: deliveryDetails.state
+        },
+        weight: packageDetails.weight,
+        dimensions: packageDetails.dimensions,
+        declaredValue: packageDetails.declaredValue || 0,
+        paymentType
+      };
+
+      const fullRate = await thirdPartyAPIService.calculateRate(
+        DELIVERY_PARTNERS.NIMBUSPOST,
+        rateData
+      );
+      const options = fullRate.courierOptions || [];
+      const selected = options.find((c) => String(c.id) === String(nimbusCourierId));
+
+      if (!selected) {
+        throw new AppError(
+          'Invalid courier selection. Please calculate rate again and pick a listed courier.',
+          400
+        );
+      }
+
+      pricing = {
+        baseRate: selected.freightCharges,
+        additionalCharges: selected.codCharges || 0,
+        totalAmount: selected.totalCharges,
+        currency: 'INR',
+        gst: 0,
+        dph: 0
+      };
+
+      nimbusMeta = {
+        nimbusCourierId: String(selected.id),
+        courierName: selected.name,
+        paymentType,
+        chargeableWeight: selected.chargeableWeight,
+        minWeight: selected.minWeight
+      };
+    } else {
+      pricing = await this.calculateRate({
+        deliveryPartner,
+        pickupDetails,
+        deliveryDetails,
+        packageDetails,
+        paymentType
+      });
+    }
 
     // Check wallet balance
     const walletBalance = await walletService.getBalance(userId);
@@ -121,7 +201,6 @@ class OrderService {
     const sequential = String(orderCount + 1).padStart(4, '0');
     const orderNumber = `ORD${timestamp}${randomSuffix}${sequential}`;
 
-    // Create order
     const order = await Order.create({
       user: userId,
       orderNumber: orderNumber,
@@ -140,7 +219,8 @@ class OrderService {
       payment: {
         status: 'pending',
         method: 'wallet'
-      }
+      },
+      metadata: Object.keys(nimbusMeta).length ? nimbusMeta : {}
     });
 
     // Deduct amount from wallet
@@ -201,7 +281,12 @@ class OrderService {
         delivery: order.deliveryDetails,
         package: order.packageDetails,
         orderId: order.orderNumber,
-        orderType: order.orderType
+        orderType: order.orderType,
+        courierId: order.metadata?.nimbusCourierId,
+        shippingCharges: Math.round(order.pricing.baseRate || 0),
+        codCharges: Math.round(order.pricing.additionalCharges || 0),
+        discount: 0,
+        paymentType: order.metadata?.paymentType || 'prepaid'
       };
 
       const shipment = await thirdPartyAPIService.createShipment(
@@ -209,10 +294,16 @@ class OrderService {
         shipmentData
       );
 
-      // Update order with AWB and tracking
       order.awb = shipment.awb || shipment.trackingNumber;
       order.trackingUrl = shipment.trackingUrl;
       order.status = ORDER_STATUS.CONFIRMED;
+      order.metadata = {
+        ...order.metadata,
+        nimbusOrderId: shipment.orderId,
+        nimbusShipmentId: shipment.shipmentId,
+        nimbusCourierName: shipment.courierName,
+        labelUrl: shipment.labelUrl
+      };
       await order.save();
 
       return shipment;
@@ -340,6 +431,113 @@ class OrderService {
         error: error.message
       };
     }
+  }
+
+  /**
+   * Apply NimbusPost webhook payload (flexible field names).
+   * Finds order by AWB, metadata.nimbusShipmentId, or metadata.nimbusOrderId.
+   */
+  async updateOrderFromNimbusWebhook(payload) {
+    if (!payload || typeof payload !== 'object') {
+      throw new AppError('Invalid webhook body', 400);
+    }
+
+    const awbVal =
+      payload.awb_number ?? payload.awb ?? payload.awbNumber ?? payload.tracking_number;
+    const shipmentId = payload.shipment_id ?? payload.shipmentId;
+    const nimbusOrderId = payload.order_id ?? payload.orderId;
+
+    let order = null;
+    if (awbVal) {
+      order = await Order.findOne({ awb: String(awbVal) });
+    }
+    if (!order && shipmentId != null) {
+      const sid = shipmentId;
+      order = await Order.findOne({
+        $or: [
+          { 'metadata.nimbusShipmentId': sid },
+          { 'metadata.nimbusShipmentId': Number(sid) },
+          { 'metadata.nimbusShipmentId': String(sid) }
+        ]
+      });
+    }
+    if (!order && nimbusOrderId != null) {
+      const oid = nimbusOrderId;
+      order = await Order.findOne({
+        $or: [
+          { 'metadata.nimbusOrderId': oid },
+          { 'metadata.nimbusOrderId': Number(oid) },
+          { 'metadata.nimbusOrderId': String(oid) }
+        ]
+      });
+    }
+
+    if (!order) {
+      throw new AppError('Order not found for Nimbus webhook', 404);
+    }
+
+    const raw =
+      payload.status ??
+      payload.order_status ??
+      payload.shipment_status ??
+      payload.current_status ??
+      '';
+    const mapped = this._mapNimbusStatusToOrderStatus(String(raw).toLowerCase());
+
+    if (!Object.values(ORDER_STATUS).includes(mapped)) {
+      throw new AppError('Could not map webhook status', 400);
+    }
+
+    const previousStatus = order.status;
+    order.status = mapped;
+    if (awbVal && !order.awb) {
+      order.awb = String(awbVal);
+    }
+    if (payload.tracking_url) {
+      order.trackingUrl = payload.tracking_url;
+    }
+    if (payload.label) {
+      order.metadata = {
+        ...order.metadata,
+        labelUrl: payload.label
+      };
+    }
+
+    order.metadata = {
+      ...order.metadata,
+      lastNimbusStatus: String(raw),
+      lastNimbusWebhookAt: new Date(),
+      statusHistory: [
+        ...(order.metadata?.statusHistory || []),
+        {
+          status: mapped,
+          previousStatus,
+          source: 'nimbuspost_webhook',
+          at: new Date()
+        }
+      ]
+    };
+
+    await order.save();
+    return order;
+  }
+
+  _mapNimbusStatusToOrderStatus(s) {
+    if (!s) return ORDER_STATUS.IN_TRANSIT;
+    const t = s.trim();
+    if (['booked', 'confirmed', 'processing', 'pending pickup'].includes(t)) {
+      return ORDER_STATUS.CONFIRMED;
+    }
+    if (t.includes('pick') && t.includes('up')) return ORDER_STATUS.PICKED_UP;
+    if (t === 'picked_up' || t === 'picked up') return ORDER_STATUS.PICKED_UP;
+    if (t.includes('transit') || t === 'in-transit') return ORDER_STATUS.IN_TRANSIT;
+    if (t.includes('out for delivery') || t.includes('ofd')) {
+      return ORDER_STATUS.OUT_FOR_DELIVERY;
+    }
+    if (t.includes('delivered')) return ORDER_STATUS.DELIVERED;
+    if (t.includes('cancel')) return ORDER_STATUS.CANCELLED;
+    if (t.includes('rto')) return ORDER_STATUS.RTO;
+    return ORDER_STATUS.IN_TRANSIT;
   }
 
   /**

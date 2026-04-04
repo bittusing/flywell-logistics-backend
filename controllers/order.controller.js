@@ -34,7 +34,8 @@ class OrderController {
             height: req.body.height || 0
           },
           declaredValue: req.body.declaredValue || 0
-        }
+        },
+        paymentType: req.body.paymentType === 'cod' ? 'cod' : 'prepaid'
       };
 
       const rate = await orderService.calculateRate(rateData);

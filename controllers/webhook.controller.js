@@ -53,6 +53,35 @@ class WebhookController {
       next(error);
     }
   }
+
+  /**
+   * NimbusPost shipment / order status webhooks.
+   * Set NIMBUSPOST_WEBHOOK_SECRET and send the same value in header X-Nimbus-Secret or query ?secret=
+   */
+  async handleNimbusWebhook(req, res, next) {
+    try {
+      const expected = process.env.NIMBUSPOST_WEBHOOK_SECRET;
+      if (expected) {
+        const header = req.headers['x-nimbus-secret'] || req.headers['x-webhook-secret'];
+        const q = req.query.secret;
+        if (header !== expected && q !== expected) {
+          return res.status(401).json({
+            success: false,
+            message: 'Invalid webhook secret'
+          });
+        }
+      }
+
+      const body = req.body?.data ?? req.body;
+      await orderService.updateOrderFromNimbusWebhook(
+        body && typeof body === 'object' ? body : req.body
+      );
+
+      return res.status(200).json({ received: true });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new WebhookController();

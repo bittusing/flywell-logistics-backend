@@ -101,7 +101,38 @@ const createOrderValidation = [
   // Delivery Partner
   body('deliveryPartner')
     .isIn(Object.values(DELIVERY_PARTNERS))
-    .withMessage('Invalid delivery partner')
+    .withMessage('Invalid delivery partner'),
+
+  body('orderType')
+    .optional()
+    .isIn(['domestic', 'international'])
+    .withMessage('Invalid order type'),
+
+  body('paymentType')
+    .optional()
+    .isIn(['prepaid', 'cod'])
+    .withMessage('paymentType must be prepaid or cod'),
+
+  body('nimbusCourierId')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 64 })
+    .withMessage('Invalid courier id'),
+
+  body()
+    .custom((value, { req }) => {
+      const orderType = req.body.orderType || 'domestic';
+      const dp = req.body.deliveryPartner;
+      if (orderType === 'domestic' && dp === DELIVERY_PARTNERS.NIMBUSPOST) {
+        const id = req.body.nimbusCourierId;
+        if (id === undefined || id === null || String(id).trim() === '') {
+          throw new Error(
+            'nimbusCourierId is required for domestic NimbusPost orders (select a courier after rate calculation)'
+          );
+        }
+      }
+      return true;
+    })
 ];
 
 /**
@@ -124,7 +155,12 @@ const calculateRateValidation = [
   
   body('deliveryPartner')
     .isIn(Object.values(DELIVERY_PARTNERS))
-    .withMessage('Invalid delivery partner')
+    .withMessage('Invalid delivery partner'),
+
+  body('paymentType')
+    .optional()
+    .isIn(['prepaid', 'cod'])
+    .withMessage('paymentType must be prepaid or cod')
 ];
 
 module.exports = {

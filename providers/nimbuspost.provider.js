@@ -83,7 +83,8 @@ class NimbusPostProvider extends BaseProvider {
       const requestData = {
         origin: rateData.from.pincode,
         destination: rateData.to.pincode,
-        payment_type: rateData.paymentType || 'prepaid', // cod or prepaid
+        payment_type:
+          rateData.paymentType === 'cod' ? 'cod' : 'prepaid',
         order_amount: Math.round(rateData.declaredValue || 1000),
         weight: this.kgToGrams(rateData.weight), // Convert kg to grams
         length: Math.round(rateData.dimensions?.length || 10),
@@ -159,7 +160,8 @@ class NimbusPostProvider extends BaseProvider {
         shipping_charges: Math.round(shipmentData.shippingCharges || 0),
         discount: Math.round(shipmentData.discount || 0),
         cod_charges: Math.round(shipmentData.codCharges || 0),
-        payment_type: shipmentData.paymentType || 'prepaid', // cod or prepaid
+        payment_type:
+          shipmentData.paymentType === 'cod' ? 'cod' : 'prepaid',
         order_amount: Math.round(packageInfo.declaredValue || 1000),
         package_weight: this.kgToGrams(packageInfo.weight),
         package_length: Math.round(packageInfo.dimensions?.length || 10),
@@ -171,7 +173,11 @@ class NimbusPostProvider extends BaseProvider {
         consignee: {
           name: delivery.name,
           address: delivery.address,
-          address_2: delivery.address2 || delivery.landmark || '',
+          address_2:
+            delivery.address2 ||
+            delivery.addressLine2 ||
+            delivery.landmark ||
+            '',
           city: delivery.city,
           state: delivery.state,
           pincode: delivery.pincode,
@@ -183,7 +189,8 @@ class NimbusPostProvider extends BaseProvider {
           warehouse_name: pickup.warehouseName || pickup.warehouse_name || 'Warehouse 1',
           name: pickup.name,
           address: pickup.address,
-          address_2: pickup.address2 || pickup.landmark || '',
+          address_2:
+            pickup.address2 || pickup.addressLine2 || pickup.landmark || '',
           city: pickup.city,
           state: pickup.state,
           pincode: pickup.pincode,

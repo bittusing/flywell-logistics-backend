@@ -21,10 +21,16 @@ class PaymentService {
    */
   async createRazorpayOrder(userId, amount) {
     try {
-      // Check if Razorpay credentials are configured
-      if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      const keyId = String(process.env.RAZORPAY_KEY_ID || '')
+        .trim()
+        .replace(/^["']|["']$/g, '');
+      const keySecret = String(process.env.RAZORPAY_KEY_SECRET || '')
+        .trim()
+        .replace(/^["']|["']$/g, '');
+
+      if (!keyId || !keySecret) {
         throw new AppError(
-          'Razorpay credentials not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env file.',
+          'Razorpay credentials not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to backend/.env on the server and restart PM2.',
           500
         );
       }
@@ -33,11 +39,12 @@ class PaymentService {
         throw new AppError('Minimum recharge amount is ₹1', 400);
       }
 
-      // Initialize Razorpay if not already initialized
-      if (!this.razorpay) {
+      // Re-init if env was fixed after first load (singleton was wrong)
+      if (!this.razorpay || this._razorpayKeyId !== keyId) {
+        this._razorpayKeyId = keyId;
         this.razorpay = new Razorpay({
-          key_id: process.env.RAZORPAY_KEY_ID,
-          key_secret: process.env.RAZORPAY_KEY_SECRET
+          key_id: keyId,
+          key_secret: keySecret
         });
       }
 
@@ -64,14 +71,32 @@ class PaymentService {
       try {
         razorpayOrder = await this.razorpay.orders.create(options);
       } catch (razorpayError) {
-        // Handle Razorpay specific errors
-        const errorMessage = razorpayError?.error?.description || 
-                            razorpayError?.error?.reason || 
-                            razorpayError?.message || 
-                            razorpayError?.toString() ||
-                            'Failed to create Razorpay order';
-        
-        console.error('Razorpay API Error:', razorpayError);
+        const status = razorpayError?.statusCode;
+        const inner = razorpayError?.error || {};
+        const errorMessage =
+          inner.description ||
+          inner.reason ||
+          inner.message ||
+          razorpayError?.message ||
+          razorpayError?.toString() ||
+          'Failed to create Razorpay order';
+
+        console.error('Razorpay API Error:', {
+          statusCode: razorpayError?.statusCode,
+          error: inner,
+          message: razorpayError?.message
+        });
+
+        if (
+          status === 401 ||
+          String(errorMessage).toLowerCase().includes('authentication')
+        ) {
+          throw new AppError(
+            'Razorpay authentication failed. Use Key ID + Key Secret from Razorpay Dashboard → Settings → API Keys (test vs live must match your account mode). Put them in server .env as RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, then restart the API.',
+            502
+          );
+        }
+
         throw new AppError(`Razorpay error: ${errorMessage}`, 500);
       }
 
@@ -92,7 +117,7 @@ class PaymentService {
         orderId: razorpayOrder.id,
         amount: razorpayOrder.amount / 100, // Convert back to rupees
         currency: razorpayOrder.currency,
-        key: process.env.RAZORPAY_KEY_ID,
+        key: keyId,
         paymentId: payment._id
       };
     } catch (error) {
@@ -120,8 +145,11 @@ class PaymentService {
    */
   verifyPayment(razorpayOrderId, razorpayPaymentId, razorpaySignature) {
     try {
+      const secret = String(process.env.RAZORPAY_KEY_SECRET || '')
+        .trim()
+        .replace(/^["']|["']$/g, '');
       const generatedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .createHmac('sha256', secret)
         .update(`${razorpayOrderId}|${razorpayPaymentId}`)
         .digest('hex');
 
