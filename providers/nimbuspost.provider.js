@@ -70,6 +70,31 @@ class NimbusPostProvider extends BaseProvider {
   }
 
   /**
+   * Nimbus requires exactly 10 digits (+91 / spaces / leading 0 stripped).
+   */
+  normalizeNimbusPhone(phone, fieldLabel = 'Phone') {
+    if (phone == null || String(phone).trim() === '') {
+      throw new AppError(`${fieldLabel} is required`, 400);
+    }
+    let digits = String(phone).replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('0')) {
+      digits = digits.slice(1);
+    }
+    if (digits.length === 12 && digits.startsWith('91')) {
+      digits = digits.slice(2);
+    } else if (digits.length > 10) {
+      digits = digits.slice(-10);
+    }
+    if (digits.length !== 10) {
+      throw new AppError(
+        `${fieldLabel} must be exactly 10 digits (Nimbus requirement); got ${digits.length} digit(s) after cleanup`,
+        400
+      );
+    }
+    return digits;
+  }
+
+  /**
    * Calculate shipping rate with serviceability
    * @param {Object} rateData - Rate calculation data
    * @returns {Promise<Object>} Rate information with courier options
@@ -154,6 +179,12 @@ class NimbusPostProvider extends BaseProvider {
       const delivery = shipmentData.delivery;
       const packageInfo = shipmentData.package;
 
+      const consigneePhone = this.normalizeNimbusPhone(
+        delivery.phone,
+        'Consignee phone'
+      );
+      const pickupPhone = this.normalizeNimbusPhone(pickup.phone, 'Pickup phone');
+
       // Prepare shipment request
       const requestData = {
         order_number: shipmentData.orderId || `#${Date.now()}`,
@@ -167,7 +198,7 @@ class NimbusPostProvider extends BaseProvider {
         package_length: Math.round(packageInfo.dimensions?.length || 10),
         package_breadth: Math.round(packageInfo.dimensions?.width || 10),
         package_height: Math.round(packageInfo.dimensions?.height || 10),
-        request_auto_pickup: 'Yes',
+        request_auto_pickup: 'yes',
         
         // Consignee (delivery) details
         consignee: {
@@ -181,7 +212,7 @@ class NimbusPostProvider extends BaseProvider {
           city: delivery.city,
           state: delivery.state,
           pincode: delivery.pincode,
-          phone: delivery.phone
+          phone: consigneePhone
         },
         
         // Pickup details (warehouse)
@@ -194,7 +225,7 @@ class NimbusPostProvider extends BaseProvider {
           city: pickup.city,
           state: pickup.state,
           pincode: pickup.pincode,
-          phone: pickup.phone
+          phone: pickupPhone
         },
         
         // Order items

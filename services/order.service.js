@@ -482,14 +482,20 @@ class OrderService {
       payload.shipment_status ??
       payload.current_status ??
       '';
-    const mapped = this._mapNimbusStatusToOrderStatus(String(raw).toLowerCase());
+    const rawStr = raw !== undefined && raw !== null ? String(raw).trim() : '';
 
-    if (!Object.values(ORDER_STATUS).includes(mapped)) {
-      throw new AppError('Could not map webhook status', 400);
+    let mapped = null;
+    if (rawStr) {
+      mapped = this._mapNimbusStatusToOrderStatus(rawStr.toLowerCase());
+      if (!Object.values(ORDER_STATUS).includes(mapped)) {
+        throw new AppError('Could not map webhook status', 400);
+      }
     }
 
     const previousStatus = order.status;
-    order.status = mapped;
+    if (mapped) {
+      order.status = mapped;
+    }
     if (awbVal && !order.awb) {
       order.awb = String(awbVal);
     }
@@ -503,18 +509,41 @@ class OrderService {
       };
     }
 
+    const webhookMeta = {
+      lastNimbusWebhookAt: new Date(),
+      lastNimbusLocation: payload.location ?? order.metadata?.lastNimbusLocation,
+      lastNimbusMessage: payload.message ?? order.metadata?.lastNimbusMessage,
+      lastNimbusEventTime: payload.event_time ?? order.metadata?.lastNimbusEventTime,
+      lastNimbusRtoAwb: payload.rto_awb ?? order.metadata?.lastNimbusRtoAwb
+    };
+    if (rawStr) {
+      webhookMeta.lastNimbusStatus = rawStr;
+    }
+
     order.metadata = {
       ...order.metadata,
-      lastNimbusStatus: String(raw),
-      lastNimbusWebhookAt: new Date(),
+      ...webhookMeta,
       statusHistory: [
         ...(order.metadata?.statusHistory || []),
-        {
-          status: mapped,
-          previousStatus,
-          source: 'nimbuspost_webhook',
-          at: new Date()
-        }
+        mapped
+          ? {
+              status: mapped,
+              previousStatus,
+              source: 'nimbuspost_webhook',
+              at: new Date(),
+              nimbusStatus: rawStr,
+              location: payload.location,
+              message: payload.message
+            }
+          : {
+              previousStatus,
+              source: 'nimbuspost_webhook',
+              at: new Date(),
+              nimbusStatus: rawStr || '(empty)',
+              location: payload.location,
+              message: payload.message,
+              note: 'status unchanged — empty or unmapped from Nimbus'
+            }
       ]
     };
 
