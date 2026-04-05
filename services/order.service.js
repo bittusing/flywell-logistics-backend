@@ -427,6 +427,26 @@ class OrderService {
     return thirdPartyAPIService.nimbusGenerateShippingLabels([sid]);
   }
 
+  /**
+   * Cancel shipment on Nimbus (POST /v1/shipments/cancel) using order AWB.
+   */
+  async cancelNimbusShipmentForOrder(orderId, userId) {
+    const order = await this.getOrderById(orderId, userId);
+    if (order.deliveryPartner !== DELIVERY_PARTNERS.NIMBUSPOST) {
+      throw new AppError('Shipment cancel is only available for NimbusPost orders', 400);
+    }
+    if (!order.awb || String(order.awb).trim() === '') {
+      throw new AppError(
+        'AWB is required to cancel. Wait until Nimbus assigns an AWB or sync from panel.',
+        400
+      );
+    }
+    const result = await thirdPartyAPIService.nimbusCancelShipment(order.awb);
+    order.status = ORDER_STATUS.CANCELLED;
+    await order.save();
+    return result;
+  }
+
   async trackOrder(orderId, userId) {
     const order = await this.getOrderById(orderId, userId);
 

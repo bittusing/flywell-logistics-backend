@@ -66,6 +66,16 @@ router.post(
 );
 
 /**
+ * @route   POST /api/orders/:id/nimbus/cancel
+ * @desc    Cancel shipment on Nimbus (api v1 /shipments/cancel, AWB)
+ * @access  Private
+ */
+router.post(
+  '/:id/nimbus/cancel',
+  orderController.cancelNimbusShipment.bind(orderController)
+);
+
+/**
  * @route   GET /api/orders/:id
  * @desc    Get order by ID
  * @access  Private

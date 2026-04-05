@@ -277,6 +277,16 @@ class ThirdPartyAPIService {
     const provider = getProvider('nimbuspost');
     return provider.generateShippingLabels(shipmentIds);
   }
+
+  /**
+   * Nimbus api.nimbuspost.com/v1 — cancel shipment by AWB (Bearer token).
+   * @param {string} awb
+   */
+  async nimbusCancelShipment(awb) {
+    const { getProvider } = require('../providers');
+    const provider = getProvider('nimbuspost');
+    return provider.cancelShipment(awb);
+  }
 }
 
 // Export singleton instance

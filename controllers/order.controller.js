@@ -173,6 +173,20 @@ class OrderController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/orders/:id/nimbus/cancel — Nimbus v1 /shipments/cancel (Bearer)
+   */
+  async cancelNimbusShipment(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+      const result = await orderService.cancelNimbusShipmentForOrder(orderId, userId);
+      return successResponse(res, result, 'Shipment cancelled with NimbusPost');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new OrderController();
