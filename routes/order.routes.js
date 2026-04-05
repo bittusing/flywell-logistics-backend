@@ -46,6 +46,26 @@ router.get(
 );
 
 /**
+ * @route   POST /api/orders/:id/nimbus/pickup
+ * @desc    Raise Nimbus pickup (ship.nimbuspost.com, NP-API-KEY)
+ * @access  Private
+ */
+router.post(
+  '/:id/nimbus/pickup',
+  orderController.requestNimbusPickup.bind(orderController)
+);
+
+/**
+ * @route   POST /api/orders/:id/nimbus/label
+ * @desc    Download Nimbus shipping label PDF
+ * @access  Private
+ */
+router.post(
+  '/:id/nimbus/label',
+  orderController.downloadNimbusLabel.bind(orderController)
+);
+
+/**
  * @route   GET /api/orders/:id
  * @desc    Get order by ID
  * @access  Private

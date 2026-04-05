@@ -126,6 +126,53 @@ class OrderController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/orders/:id/nimbus/pickup
+   */
+  async requestNimbusPickup(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+      const result = await orderService.requestNimbusPickupForOrder(orderId, userId);
+      return successResponse(res, result, 'Pickup request submitted');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/orders/:id/nimbus/label — PDF attachment or JSON wrapper
+   */
+  async downloadNimbusLabel(req, res, next) {
+    try {
+      const userId = req.user._id;
+      const orderId = req.params.id;
+      const result = await orderService.generateNimbusLabelForOrder(orderId, userId);
+
+      if (result.type === 'pdf') {
+        res.setHeader('Content-Type', result.contentType || 'application/pdf');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${result.filename || 'label.pdf'}"`
+        );
+        return res.send(result.buffer);
+      }
+
+      if (result.type === 'json') {
+        return successResponse(res, { label: result.data }, 'Label data retrieved');
+      }
+
+      res.setHeader('Content-Type', result.contentType || 'application/octet-stream');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${result.filename || 'label.bin'}"`
+      );
+      return res.send(result.buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new OrderController();

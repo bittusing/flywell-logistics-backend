@@ -391,6 +391,42 @@ class OrderService {
    * @param {String} userId - User ID
    * @returns {Object} Tracking information
    */
+  /**
+   * Raise Nimbus pickup for an order (uses metadata.nimbusShipmentId).
+   */
+  async requestNimbusPickupForOrder(orderId, userId) {
+    const order = await this.getOrderById(orderId, userId);
+    if (order.deliveryPartner !== DELIVERY_PARTNERS.NIMBUSPOST) {
+      throw new AppError('Pickup is only available for NimbusPost domestic orders', 400);
+    }
+    const sid = order.metadata?.nimbusShipmentId;
+    if (sid == null || sid === '') {
+      throw new AppError(
+        'Nimbus shipment is not booked yet (missing shipment id). Wait for booking or check Nimbus panel.',
+        400
+      );
+    }
+    return thirdPartyAPIService.nimbusRequestPickup([sid]);
+  }
+
+  /**
+   * Generate Nimbus shipping label PDF (or JSON) for an order.
+   */
+  async generateNimbusLabelForOrder(orderId, userId) {
+    const order = await this.getOrderById(orderId, userId);
+    if (order.deliveryPartner !== DELIVERY_PARTNERS.NIMBUSPOST) {
+      throw new AppError('Shipping label is only available for NimbusPost orders', 400);
+    }
+    const sid = order.metadata?.nimbusShipmentId;
+    if (sid == null || sid === '') {
+      throw new AppError(
+        'Nimbus shipment is not booked yet (missing shipment id).',
+        400
+      );
+    }
+    return thirdPartyAPIService.nimbusGenerateShippingLabels([sid]);
+  }
+
   async trackOrder(orderId, userId) {
     const order = await this.getOrderById(orderId, userId);
 

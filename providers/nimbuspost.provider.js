@@ -1,5 +1,19 @@
+const axios = require('axios');
 const BaseProvider = require('./base.provider');
 const AppError = require('../utils/AppError');
+
+/**
+ * Normalize .env values: Windows \\r, surrounding quotes, accidental spaces.
+ * Important: duplicate KEY= lines in .env — dotenv uses the LAST one; a second truncated line breaks Ship API.
+ */
+function envTrim(name) {
+  const v = process.env[name];
+  if (v == null || v === '') return '';
+  return String(v)
+    .replace(/\r/g, '')
+    .trim()
+    .replace(/^["']|["']$/g, '');
+}
 
 /**
  * NimbusPost Provider
@@ -8,11 +22,23 @@ const AppError = require('../utils/AppError');
 class NimbusPostProvider extends BaseProvider {
   constructor() {
     super('nimbuspost', 'https://api.nimbuspost.com/v1');
-    
+
     this.email = process.env.NIMBUSPOST_EMAIL;
     this.password = process.env.NIMBUSPOST_PASSWORD;
+    /** Ship portal APIs (pickup, label) use NP-API-KEY — same key as Nimbus ship dashboard */
+    this.shipApiBaseUrl =
+      envTrim('NIMBUSPOST_SHIP_API_BASE') || 'https://ship.nimbuspost.com/api';
+    this.nimbusApiKey = envTrim('NIMBUSPOST_API_KEY') || undefined;
     this.accessToken = null;
     this.tokenExpiry = null;
+
+    if (process.env.NODE_ENV === 'development' && this.nimbusApiKey) {
+      console.log(
+        '[NimbusPost] NIMBUSPOST_API_KEY loaded (length:',
+        this.nimbusApiKey.length,
+        ') — if pickup/label fail, ensure only ONE key in .env and it matches Ship panel → API'
+      );
+    }
   }
 
   /**
@@ -456,6 +482,249 @@ class NimbusPostProvider extends BaseProvider {
      }
    }
 
+  /**
+   * Base URL for ship.nimbuspost.com APIs (must include `/api`).
+   * If env is only `https://ship.nimbuspost.com`, `/api` is appended to avoid 404 on wrong path.
+   */
+  /**
+   * Always read latest env (singleton loads before dotenv in some tests; nodemon restarts need fresh base).
+   */
+  normalizeShipApiBaseUrl() {
+    const raw = (
+      envTrim('NIMBUSPOST_SHIP_API_BASE') ||
+      this.shipApiBaseUrl ||
+      'https://ship.nimbuspost.com/api'
+    ).replace(/\/+$/, '');
+    try {
+      const u = new URL(raw);
+      if (u.pathname === '/' || u.pathname === '') {
+        return `${u.origin}/api`;
+      }
+    } catch (_) {
+      /* keep raw */
+    }
+    return raw;
+  }
+
+  /**
+   * Ship API — NP-API-KEY + JSON body (Nimbus rejects form-urlencoded).
+   */
+  requireNimbusShipApiKey() {
+    const key = envTrim('NIMBUSPOST_API_KEY') || this.nimbusApiKey;
+    if (!key) {
+      throw new AppError(
+        'NIMBUSPOST_API_KEY is not configured (required for pickup & label on ship.nimbuspost.com)',
+        500
+      );
+    }
+    return key;
+  }
+
+  /**
+   * Ship portal: use native fetch so JSON body + binary PDF response stay correct (axios + arraybuffer is flaky).
+   * Falls back to axios on older Node without fetch.
+   */
+  async shipApiPost(path, jsonBody, { accept, responseType = 'json' } = {}) {
+    const apiKey = this.requireNimbusShipApiKey();
+    const base = this.normalizeShipApiBaseUrl();
+    const pathNorm = path.startsWith('/') ? path : `/${path}`;
+    const url = `${base}${pathNorm}`;
+    const bodyStr = JSON.stringify(jsonBody);
+    const hdrs = {
+      'Content-Type': 'application/json',
+      'NP-API-KEY': apiKey,
+      Accept: accept || 'application/json'
+    };
+
+    console.log('[NimbusPost Ship API] POST', url);
+
+    if (typeof globalThis.fetch === 'function') {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: hdrs,
+        body: bodyStr
+      });
+      const status = res.status;
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      const headers = { 'content-type': ct };
+
+      if (responseType === 'arraybuffer') {
+        const buf = Buffer.from(await res.arrayBuffer());
+        return { status, headers, data: buf };
+      }
+
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
+      }
+      return { status, headers, data };
+    }
+
+    return axios({
+      method: 'POST',
+      url,
+      data: bodyStr,
+      headers: hdrs,
+      timeout: responseType === 'arraybuffer' ? 120000 : 60000,
+      responseType,
+      validateStatus: (s) => s < 600,
+      transformRequest: [(data, headers) => {
+        if (typeof data === 'string') {
+          headers['Content-Type'] = 'application/json';
+        }
+        return data;
+      }]
+    });
+  }
+
+  /**
+   * POST /shipments/pickups — raise pickup for shipment id(s)
+   * @param {Array<number|string>} shipmentIds - Nimbus shipment IDs
+   */
+  async requestPickup(shipmentIds) {
+    try {
+      const ids = Array.isArray(shipmentIds) ? shipmentIds : [shipmentIds];
+      const cleaned = ids.map((id) => String(id).trim()).filter(Boolean);
+      if (!cleaned.length) {
+        throw new AppError('At least one shipment id is required', 400);
+      }
+
+      const idsNumeric = cleaned.map((id) => {
+        const n = Number(id);
+        return Number.isFinite(n) ? n : id;
+      });
+
+      console.log('[NimbusPost Ship API] POST /shipments/pickups', {
+        count: cleaned.length,
+        base: this.normalizeShipApiBaseUrl()
+      });
+
+      const response = await this.shipApiPost(
+        '/shipments/pickups',
+        { ids: idsNumeric },
+        { accept: 'application/json' }
+      );
+
+      const data = response.data;
+      if (data && data.status === false) {
+        throw new AppError(data.message || 'Pickup request rejected by Nimbus', 400);
+      }
+      if (response.status >= 400) {
+        throw new AppError(
+          data?.message || data?.error || `Pickup request failed (${response.status})`,
+          response.status
+        );
+      }
+
+      return data;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const msg =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message;
+      console.error('[NimbusPost Ship API] pickup error:', error.response?.data || msg);
+      throw new AppError(`Nimbus pickup failed: ${msg}`, error.response?.status || 500);
+    }
+  }
+
+  /**
+   * POST /shipments/label — PDF or JSON with label URL
+   * @param {Array<number|string>} shipmentIds - Nimbus shipment IDs (comma-separated in API)
+   */
+  async generateShippingLabels(shipmentIds) {
+    try {
+      const ids = Array.isArray(shipmentIds) ? shipmentIds : [shipmentIds];
+      const cleaned = ids.map((id) => String(id).trim()).filter(Boolean);
+      if (!cleaned.length) {
+        throw new AppError('At least one shipment id is required', 400);
+      }
+
+      const idsNumeric = cleaned
+        .map((x) => parseInt(x, 10))
+        .filter((n) => !Number.isNaN(n));
+      const idsComma = cleaned.join(',');
+
+      console.log('[NimbusPost Ship API] POST /shipments/label', {
+        idsComma,
+        idsNumeric,
+        base: this.normalizeShipApiBaseUrl()
+      });
+
+      const labelAccept = 'application/pdf, application/json, */*';
+      let response = await this.shipApiPost(
+        '/shipments/label',
+        { ids: idsComma },
+        { accept: labelAccept, responseType: 'arraybuffer' }
+      );
+
+      if (response.status >= 400) {
+        console.warn(
+          '[NimbusPost Ship API] label comma-ids HTTP',
+          response.status,
+          '- retrying with ids as array'
+        );
+        response = await this.shipApiPost(
+          '/shipments/label',
+          { ids: idsNumeric.length ? idsNumeric : cleaned },
+          { accept: labelAccept, responseType: 'arraybuffer' }
+        );
+      }
+
+      const status = response.status;
+      const ct = (
+        response.headers['content-type'] ||
+        response.headers['Content-Type'] ||
+        ''
+      ).toLowerCase();
+
+      if (status >= 400) {
+        let msg = 'Label generation failed';
+        try {
+          const txt = Buffer.from(response.data).toString('utf8');
+          const j = JSON.parse(txt);
+          msg = j.message || j.error || msg;
+        } catch (_) {
+          try {
+            msg = Buffer.from(response.data).toString('utf8').slice(0, 500);
+          } catch (_) {}
+        }
+        throw new AppError(msg, status);
+      }
+
+      if (ct.includes('application/pdf')) {
+        return {
+          type: 'pdf',
+          buffer: Buffer.from(response.data),
+          filename: `shipping-label-${cleaned.join('-')}.pdf`,
+          contentType: 'application/pdf'
+        };
+      }
+
+      if (ct.includes('application/json')) {
+        const json = JSON.parse(Buffer.from(response.data).toString('utf8'));
+        if (json.status === false && json.message) {
+          throw new AppError(json.message, 400);
+        }
+        return { type: 'json', data: json };
+      }
+
+      return {
+        type: 'raw',
+        buffer: Buffer.from(response.data),
+        contentType: ct || 'application/octet-stream',
+        filename: `label-${cleaned.join('-')}.bin`
+      };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const msg = error.response?.data?.message || error.message;
+      console.error('[NimbusPost Ship API] label error:', msg);
+      throw new AppError(`Nimbus label failed: ${msg}`, error.response?.status || 500);
+    }
+  }
 }
 
 module.exports = NimbusPostProvider;

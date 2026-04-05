@@ -257,6 +257,26 @@ class ThirdPartyAPIService {
   isProviderAvailable(partner) {
     return hasProvider(partner);
   }
+
+  /**
+   * Nimbus ship.nimbuspost.com — raise pickup (NP-API-KEY)
+   * @param {Array<string|number>} shipmentIds
+   */
+  async nimbusRequestPickup(shipmentIds) {
+    const { getProvider } = require('../providers');
+    const provider = getProvider('nimbuspost');
+    return provider.requestPickup(shipmentIds);
+  }
+
+  /**
+   * Nimbus ship.nimbuspost.com — generate label PDF / JSON (NP-API-KEY)
+   * @param {Array<string|number>} shipmentIds
+   */
+  async nimbusGenerateShippingLabels(shipmentIds) {
+    const { getProvider } = require('../providers');
+    const provider = getProvider('nimbuspost');
+    return provider.generateShippingLabels(shipmentIds);
+  }
 }
 
 // Export singleton instance
