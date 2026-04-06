@@ -71,24 +71,20 @@ class OrderService {
         metadata: rateResponse.metadata || {}
       };
     } catch (error) {
-      // If third-party API fails, use fallback calculation
-      console.warn('Third-party API failed, using fallback calculation:', error.message);
-
-      // Simple fallback: ₹50 base + ₹10 per kg
-      const baseRate = 50;
-      const weightCharge = packageDetails.weight * 10;
-      const totalAmount = baseRate + weightCharge;
-
-      return {
-        baseRate,
-        additionalCharges: weightCharge,
-        totalAmount,
-        currency: 'INR',
+      console.error('[OrderService.calculateRate] carrier failed', {
         partner: deliveryPartner,
-        estimatedDelivery: '3-5 business days',
-        serviceType: 'standard',
-        note: 'Fallback calculation used'
-      };
+        pickup: pickupDetails?.pincode,
+        delivery: deliveryDetails?.pincode,
+        message: error.message,
+        statusCode: error.statusCode
+      });
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError(
+        'Shipping rates could not be loaded at the moment. Please try again in a few minutes.',
+        503
+      );
     }
   }
 

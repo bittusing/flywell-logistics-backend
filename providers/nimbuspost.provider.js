@@ -212,12 +212,23 @@ class NimbusPostProvider extends BaseProvider {
       console.log('NimbusPost Rate Request:', requestData);
 
       const response = await client.post('/courier/serviceability', requestData, { headers });
+      const payload = response.data;
 
-      if (!response.data.status || !response.data.data) {
-        throw new AppError('No courier services available', 400);
+      const couriers = Array.isArray(payload?.data) ? payload.data : [];
+
+      if (!payload?.status || couriers.length === 0) {
+        console.warn('[NimbusPost] serviceability — no couriers', {
+          request: requestData,
+          apiStatus: payload?.status,
+          apiMessage: payload?.message,
+          courierCount: couriers.length,
+          raw: payload
+        });
+        const hint =
+          payload?.message ||
+          'No courier is available for this origin–destination and package. Check pincodes, weight, and dimensions.';
+        throw new AppError(hint, 400);
       }
-
-      const couriers = response.data.data;
 
       // Sort by total charges (cheapest first)
       couriers.sort((a, b) => a.total_charges - b.total_charges);
@@ -252,6 +263,9 @@ class NimbusPostProvider extends BaseProvider {
         }
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       this.handleError(error, 'calculateRate');
     }
   }
