@@ -48,7 +48,6 @@ class EmailService {
     if (text) body.append('text', text);
     if (html) body.append('html', html);
 
-<<<<<<< HEAD
     try {
       const response = await axios.post(url, body.toString(), {
         auth: {
@@ -73,7 +72,6 @@ class EmailService {
       });
       return { sent: false, error: data?.message || error.message };
     }
-=======
     await axios.post(url, body.toString(), {
       auth: {
         username: 'api',
@@ -86,7 +84,6 @@ class EmailService {
     });
 
     return { sent: true };
->>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
   }
 
   /**

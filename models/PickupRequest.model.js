@@ -92,10 +92,7 @@ pickupRequestSchema.pre('save', async function (next) {
 
 // Indexes
 pickupRequestSchema.index({ user: 1, createdAt: -1 });
-<<<<<<< HEAD
-=======
 pickupRequestSchema.index({ pickupId: 1 });
->>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 pickupRequestSchema.index({ status: 1 });
 pickupRequestSchema.index({ pickupDate: 1 });
 

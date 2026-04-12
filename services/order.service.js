@@ -102,12 +102,8 @@ class OrderService {
       deliveryPartner,
       orderType = 'domestic',
       nimbusCourierId,
-<<<<<<< HEAD
       paymentType = 'prepaid',
       products = []
-=======
-      paymentType = 'prepaid'
->>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
     } = orderData;
 
     if (
@@ -216,10 +212,7 @@ class OrderService {
         totalAmount: pricing.totalAmount,
         currency: pricing.currency
       },
-<<<<<<< HEAD
       products: products,
-=======
->>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
       status: ORDER_STATUS.PENDING,
       payment: {
         status: 'pending',
@@ -291,12 +284,9 @@ class OrderService {
         shippingCharges: Math.round(order.pricing.baseRate || 0),
         codCharges: Math.round(order.pricing.additionalCharges || 0),
         discount: 0,
-<<<<<<< HEAD
         paymentType: order.metadata?.paymentType || 'prepaid',
-        products: order.products || []
-=======
+        products: order.products || [],
         paymentType: order.metadata?.paymentType || 'prepaid'
->>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
       };
 
       const shipment = await thirdPartyAPIService.createShipment(

@@ -4,12 +4,8 @@ const pincodeSchema = new mongoose.Schema({
   pincode: {
     type: String,
     required: true,
-<<<<<<< HEAD
-    unique: true
-=======
     unique: true,
     index: true
->>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
   },
   city: {
     type: String,
@@ -47,10 +43,7 @@ const pincodeSchema = new mongoose.Schema({
 });
 
 // Index for faster searches
-<<<<<<< HEAD
-=======
 pincodeSchema.index({ pincode: 1 });
->>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 pincodeSchema.index({ city: 1 });
 pincodeSchema.index({ state_code: 1 });
 

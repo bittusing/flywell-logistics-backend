@@ -84,14 +84,11 @@ const userSchema = new mongoose.Schema({
     approvedAt: Date,
     rejectedAt: Date,
     rejectionReason: String
-<<<<<<< HEAD
   },
   businessAddress: {
     type: String,
     trim: true,
     default: ""
-=======
->>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
   }
 }, {
   timestamps: true
