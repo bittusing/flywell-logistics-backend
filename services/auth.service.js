@@ -74,7 +74,10 @@ class AuthService {
         phone: user.phone,
         wallet: wallet._id,
         kycStatus: user.kycStatus || 'not_started',
+<<<<<<< HEAD
         kycData: user.kycData || null,
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
         authProvider: user.authProvider || 'local'
       },
       token
@@ -132,7 +135,10 @@ class AuthService {
         wallet: user.wallet?._id || null,
         role: user.role,
         kycStatus: user.kycStatus,
+<<<<<<< HEAD
         kycData: user.kycData || null,
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
         authProvider: user.authProvider
       },
       token
@@ -223,7 +229,10 @@ class AuthService {
         wallet: user.wallet?._id || null,
         role: user.role,
         kycStatus: user.kycStatus,
+<<<<<<< HEAD
         kycData: user.kycData || null,
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
         authProvider: user.authProvider
       },
       token
@@ -240,6 +249,7 @@ class AuthService {
 
     const user = await User.findOne({ email: email.toLowerCase() });
 
+<<<<<<< HEAD
     if (!user) {
       console.log(`[AuthService] Password reset skipped: No user found with email ${email}`);
       return { message: genericMessage };
@@ -247,11 +257,17 @@ class AuthService {
 
     if (!user.isActive) {
       console.log(`[AuthService] Password reset skipped: User ${email} is deactivated`);
+=======
+    if (!user || !user.isActive) {
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
       return { message: genericMessage };
     }
 
     if (user.authProvider === 'google') {
+<<<<<<< HEAD
       console.log(`[AuthService] Password reset skipped: User ${email} is a Google account (must use Google sign-in)`);
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
       return { message: genericMessage };
     }
 
@@ -262,12 +278,16 @@ class AuthService {
     user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save({ validateBeforeSave: false });
 
+<<<<<<< HEAD
     console.log(`[AuthService] Sending password reset email to ${user.email}...`);
 
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
     const baseUrl =
       process.env.PUBLIC_APP_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
     const resetUrl = `${String(baseUrl).replace(/\/$/, '')}/reset-password?token=${resetToken}`;
 
+<<<<<<< HEAD
     const mailResult = await emailService.sendPasswordResetEmail(user.email, resetUrl);
     
     if (mailResult.sent) {
@@ -275,6 +295,9 @@ class AuthService {
     } else {
       console.error(`[AuthService] FAILED to send reset email to ${user.email}`);
     }
+=======
+    await emailService.sendPasswordResetEmail(user.email, resetUrl);
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 
     return { message: genericMessage };
   }
@@ -328,11 +351,15 @@ class AuthService {
       wallet: user.wallet?._id || null,
       role: user.role,
       kycStatus: user.kycStatus,
+<<<<<<< HEAD
       kycData: user.kycData || null,
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
       balance: user.wallet?.balance || 0,
       authProvider: user.authProvider || 'local'
     };
   }
+<<<<<<< HEAD
 
   /**
    * Change password for authenticated user
@@ -398,6 +425,8 @@ class AuthService {
       kycData: user.kycData || null
     };
   }
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 }
 
 module.exports = new AuthService();

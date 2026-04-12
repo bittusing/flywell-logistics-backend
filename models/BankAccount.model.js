@@ -59,6 +59,12 @@ const bankAccountSchema = new mongoose.Schema({
   timestamps: true
 });
 
+<<<<<<< HEAD
+=======
+// Index for faster queries
+bankAccountSchema.index({ user: 1 });
+
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 const BankAccount = mongoose.model('BankAccount', bankAccountSchema);
 
 module.exports = BankAccount;

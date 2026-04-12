@@ -112,6 +112,7 @@ const orderSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+<<<<<<< HEAD
   // Products for international customs
   products: [{
     description: { type: String, required: true },
@@ -120,6 +121,8 @@ const orderSchema = new mongoose.Schema({
     unitRate: { type: Number, required: true, default: 0 },
     pieceWt: { type: Number, required: true, default: 0 }
   }],
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
   // Metadata
   metadata: {
     type: mongoose.Schema.Types.Mixed,
@@ -143,6 +146,10 @@ orderSchema.pre('save', async function (next) {
 
 // Indexes for better query performance
 orderSchema.index({ user: 1, createdAt: -1 });
+<<<<<<< HEAD
+=======
+orderSchema.index({ orderNumber: 1 });
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 orderSchema.index({ awb: 1 });
 orderSchema.index({ status: 1 });
 

@@ -114,6 +114,7 @@ class AuthController {
       next(error);
     }
   }
+<<<<<<< HEAD
 
   /**
    * @route POST /api/auth/change-password
@@ -138,6 +139,8 @@ class AuthController {
       next(error);
     }
   }
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 }
 
 module.exports = new AuthController();

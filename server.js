@@ -3,8 +3,11 @@ require('./config/loadEnv');
 
 const express = require('express');
 const cors = require('cors');
+<<<<<<< HEAD
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 
 // Import configurations
 const connectDB = require('./config/database');
@@ -23,7 +26,10 @@ const adminRoutes = require('./routes/admin.routes');
 const bankAccountRoutes = require('./routes/bankAccount.routes');
 const pincodeRoutes = require('./routes/pincode.routes');
 const awbRoutes = require('./routes/awb.routes');
+<<<<<<< HEAD
 const warehouseRoutes = require('./routes/warehouse.routes');
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler.middleware');
@@ -34,6 +40,7 @@ const app = express();
 // Connect to database
 connectDB();
 
+<<<<<<< HEAD
 // Request logging
 app.use(morgan('dev'));
 
@@ -50,6 +57,8 @@ const limiter = rateLimit({
 // Apply limiter to all API routes
 app.use('/api', limiter);
 
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 // Middleware - CORS Configuration
 // const allowedOrigins = [
 //   'http://localhost:3000',
@@ -142,7 +151,10 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/bank-account', bankAccountRoutes);
 app.use('/api/pincode', pincodeRoutes);
 app.use('/api/awb', awbRoutes);
+<<<<<<< HEAD
 app.use('/api/warehouses', warehouseRoutes);
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 
 // 404 handler - must be after all routes
 app.use((req, res) => {

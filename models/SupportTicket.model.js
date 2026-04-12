@@ -83,6 +83,10 @@ supportTicketSchema.pre('save', async function (next) {
 
 // Indexes
 supportTicketSchema.index({ user: 1, createdAt: -1 });
+<<<<<<< HEAD
+=======
+supportTicketSchema.index({ ticketNumber: 1 });
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 supportTicketSchema.index({ status: 1 });
 
 const SupportTicket = mongoose.model('SupportTicket', supportTicketSchema);

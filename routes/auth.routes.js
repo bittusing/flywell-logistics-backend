@@ -83,6 +83,7 @@ router.get(
   authController.getCurrentUser.bind(authController)
 );
 
+<<<<<<< HEAD
 /**
  * @route   POST /api/auth/change-password
  * @desc    Change password for logged in user
@@ -105,4 +106,6 @@ router.patch(
   authController.updateMe.bind(authController)
 );
 
+=======
+>>>>>>> e173c96881d6134e0904d3ff749bc7ec6eb3cc5a
 module.exports = router;
